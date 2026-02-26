@@ -340,7 +340,8 @@ class NewsValidator:
     def enhance_prediction(self, bert_result: Dict, ai_result: Optional[Dict], 
                           news_validation: Optional[Dict]) -> Dict:
         """
-        Enhance the final prediction with news validation data
+        Enhance the final prediction with news validation data.
+        NEWS SOURCES CAN OVERRIDE AI/MODEL PREDICTIONS when strong evidence exists.
         
         Args:
             bert_result: Model prediction (already corrected by AI silently)
@@ -358,6 +359,7 @@ class NewsValidator:
             
             # Adjust final prediction based on news validation
             verification = news_validation['verification_status']
+            relevant_count = news_validation.get('relevant_articles', 0)
             
             if verification == 'not_found':
                 # If no news found, slightly increase fake probability
@@ -369,17 +371,33 @@ class NewsValidator:
                     result['confidence'] = max(0.3, result.get('confidence', 0.5) - 0.15)
                 
             elif verification == 'found':
-                # If news found, increase real probability
-                result['news_insight'] = "✓ Confirmed by multiple news sources."
-                result['verification_boost'] = 0.15  # Increase trust
+                # NEWS SOURCES FOUND - this is strong evidence the news is REAL
+                result['news_insight'] = f"✓ Confirmed by {relevant_count} news source(s)."
+                result['verification_boost'] = 0.2  # Increase trust
                 
-                # If prediction is "real" and news confirms, boost confidence
-                if result.get('prediction') == 'real':
+                # OVERRIDE: If prediction was "fake" but multiple credible sources confirm,
+                # the news is likely REAL - override the AI/model prediction
+                if result.get('prediction') == 'fake' and relevant_count >= 1:
+                    result['prediction'] = 'real'
+                    result['is_fake'] = False
+                    result['confidence'] = min(0.90, 0.7 + (relevant_count * 0.05))
+                    result['news_insight'] = f"✓ Verified as REAL by {relevant_count} credible news source(s). AI prediction overridden."
+                    result['override_reason'] = 'news_sources_confirm'
+                elif result.get('prediction') == 'real':
+                    # Boost confidence for real prediction
                     result['confidence'] = min(0.95, result.get('confidence', 0.5) + 0.15)
                 
             elif verification == 'limited':
                 result['news_insight'] = "Limited news coverage found."
-                result['verification_boost'] = 0.05
+                result['verification_boost'] = 0.1
+                
+                # Even 1 source is evidence - override fake prediction
+                if result.get('prediction') == 'fake' and relevant_count >= 1:
+                    result['prediction'] = 'real'
+                    result['is_fake'] = False
+                    result['confidence'] = min(0.75, 0.6 + (relevant_count * 0.05))
+                    result['news_insight'] = f"✓ Found {relevant_count} news source(s) covering this topic. Likely REAL."
+                    result['override_reason'] = 'news_source_found'
                 
             else:  # unverified
                 result['news_insight'] = "Unable to verify against news sources."
@@ -389,7 +407,7 @@ class NewsValidator:
             result['news_insight'] = "News validation not available."
             result['verification_boost'] = 0.0
         
-        # Update is_fake based on prediction
+        # Update is_fake based on final prediction
         if result.get('prediction'):
             result['is_fake'] = result['prediction'] == 'fake'
         

@@ -83,7 +83,7 @@ def get_model():
     Returns:
         tuple: (model, tokenizer, checkpoint_info)
     """
-    model_path = Path(__file__).parent.parent.parent / "enhanced_bert_liar_model"
+    model_path = Path(__file__).parent.parent.parent / "enhanced_bert_welfake_model"
     
     # Load tokenizer
     tokenizer = BertTokenizer.from_pretrained(str(model_path))
@@ -121,7 +121,7 @@ def predict_fake_news(text: str, model=None, tokenizer=None, checkpoint=None):
     Predict whether a news article is fake or real.
     
     Args:
-        text: News article text
+        text: News article text (can be title only, or title [SEP] text format)
         model: Pre-loaded model (optional)
         tokenizer: Pre-loaded tokenizer (optional)
         checkpoint: Model checkpoint with metadata (optional)
@@ -134,18 +134,27 @@ def predict_fake_news(text: str, model=None, tokenizer=None, checkpoint=None):
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
+    # Format input to match training format: title [SEP] text
+    # If input doesn't have [SEP], treat the whole input as title + duplicate as text
+    if '[SEP]' not in text:
+        # User passed only headline/claim - format it like training data
+        # Use the text as both title and content for better model understanding
+        formatted_text = f"{text} [SEP] {text}"
+    else:
+        formatted_text = text
+    
     # Determine classification type from checkpoint
     num_classes = checkpoint.get('num_classes', 2) if checkpoint else 2
     classification_type = checkpoint.get('classification_type', 'binary') if checkpoint else 'binary'
     
     # Label mapping based on classification type
-    # NOTE: Based on training notebook:
-    # 0 = fake (pants-fire, false, barely-true, half-true)
-    # 1 = real (mostly-true, true)
+    # NOTE: WELFake dataset uses:
+    # 0 = real (legitimate news)
+    # 1 = fake (fake/misleading news)
     if classification_type == 'binary' and num_classes == 2:
         labels = {
-            0: "fake",
-            1: "real"
+            0: "real",
+            1: "fake"
         }
     elif num_classes == 6:
         labels = {
@@ -159,9 +168,9 @@ def predict_fake_news(text: str, model=None, tokenizer=None, checkpoint=None):
     else:
         labels = {i: f"class_{i}" for i in range(num_classes)}
     
-    # Tokenize input
+    # Tokenize input (use formatted text)
     encoding = tokenizer(
-        text,
+        formatted_text,
         add_special_tokens=True,
         max_length=512,
         padding='max_length',
@@ -184,12 +193,12 @@ def predict_fake_news(text: str, model=None, tokenizer=None, checkpoint=None):
     
     # Determine if fake based on classification type
     if classification_type == 'binary':
-        is_fake = predicted_class == 0  # class 0 is "fake"
+        is_fake = predicted_class == 1  # class 1 is "fake" in WELFake dataset
     else:
         is_fake = predicted_class < 3  # pants-fire, false, barely-true are considered fake
     
     return {
-        "text": text,
+        "text": text,  # Return original text, not formatted
         "prediction": labels[predicted_class],
         "confidence": float(confidence),
         "probabilities": prob_dict,

@@ -16,43 +16,68 @@ async def predict(
 ):
     """
     Predict whether a news article is fake or real.
-    Uses Gemini AI as primary predictor, with BERT as fallback.
+    Flow: BERT Model (primary) → Gemini AI (verification) → News Sources (override)
     Requires authentication.
     
     Args:
-        request: PredictionRequest containing the news text
+        request: PredictionRequest containing the news title and optional text
         
     Returns:
         PredictionResponse with prediction label, confidence, and probabilities
     """
     try:
-        # Try AI prediction first (primary)
-        ai_result = ai_checker.predict(request.text)
+        # Format input: combine title and text with [SEP] like training data
+        if request.text:
+            formatted_input = f"{request.title} [SEP] {request.text}"
+        else:
+            # Only title provided - duplicate for model compatibility
+            formatted_input = f"{request.title} [SEP] {request.title}"
+        
+        # STEP 1: BERT Model prediction (PRIMARY)
+        model, tokenizer, checkpoint = get_model()
+        bert_result = predict_fake_news(formatted_input, model, tokenizer, checkpoint)
+        bert_result["text"] = request.title
+        
+        final_result = {
+            **bert_result,
+            "is_fake": bert_result["prediction"] == "fake",
+            "prediction_source": "bert_model"
+        }
+        
+        # STEP 2: Gemini AI verification (can adjust prediction)
+        ai_result = ai_checker.predict(request.title)
         
         if ai_result:
-            # AI prediction successful - use it
-            final_result = ai_result
-            final_result["text"] = request.text
-        else:
-            # Fallback to BERT model
-            model, tokenizer, checkpoint = get_model()
-            bert_result = predict_fake_news(request.text, model, tokenizer, checkpoint)
-            final_result = {
-                **bert_result,
-                "is_fake": bert_result["prediction"] == "fake"
-            }
+            # If BERT and Gemini disagree, use the one with higher confidence
+            bert_confidence = bert_result["confidence"]
+            ai_confidence = ai_result["confidence"]
+            
+            if bert_result["prediction"] != ai_result["prediction"]:
+                # Disagreement - use higher confidence prediction
+                if ai_confidence > bert_confidence:
+                    final_result["prediction"] = ai_result["prediction"]
+                    final_result["confidence"] = ai_confidence
+                    final_result["probabilities"] = ai_result["probabilities"]
+                    final_result["is_fake"] = ai_result["is_fake"]
+                    final_result["prediction_source"] = "gemini_ai"
+                    final_result["ai_override"] = True
+                # else keep BERT prediction
+            else:
+                # Agreement - boost confidence
+                final_result["confidence"] = min(0.98, (bert_confidence + ai_confidence) / 2 + 0.1)
+                final_result["prediction_source"] = "bert_model+gemini_ai"
         
-        # Validate against real news sources
-        news_validation = news_validator.validate_claim(request.text)
+        # STEP 3: News validation (can OVERRIDE based on evidence)
+        news_validation = news_validator.validate_claim(request.title)
         
-        # Add news validation insights
+        # Add news validation insights - this can override both BERT and Gemini
         final_result = news_validator.enhance_prediction(final_result, ai_result, news_validation)
         
         # Save prediction to history
         predictions_collection = get_predictions_collection()
         prediction_record = {
             "user_id": str(current_user["_id"]),
-            "text": request.text[:500],  # Limit stored text
+            "text": request.title[:500],  # Store title
             "prediction": final_result["prediction"],
             "confidence": final_result["confidence"],
             "is_fake": final_result["is_fake"],
@@ -71,7 +96,7 @@ async def batch_predict(
 ):
     """
     Predict multiple news articles at once.
-    Uses Gemini AI as primary predictor, with BERT as fallback.
+    Flow: BERT Model (primary) → Gemini AI (verification) → News Sources (override)
     Requires authentication.
     
     Args:
@@ -86,21 +111,29 @@ async def batch_predict(
         predictions_collection = get_predictions_collection()
         
         for text in texts:
-            # Try AI prediction first (primary)
+            # Format input for BERT
+            formatted_input = f"{text} [SEP] {text}"
+            
+            # STEP 1: BERT Model prediction (PRIMARY)
+            bert_result = predict_fake_news(formatted_input, model, tokenizer, checkpoint)
+            bert_result["text"] = text
+            final_result = {
+                **bert_result,
+                "is_fake": bert_result["prediction"] == "fake",
+                "prediction_source": "bert_model"
+            }
+            
+            # STEP 2: Gemini AI verification
             ai_result = ai_checker.predict(text)
-            
             if ai_result:
-                final_result = ai_result
-                final_result["text"] = text
-            else:
-                # Fallback to BERT
-                bert_result = predict_fake_news(text, model, tokenizer, checkpoint)
-                final_result = {
-                    **bert_result,
-                    "is_fake": bert_result["prediction"] == "fake"
-                }
+                if bert_result["prediction"] != ai_result["prediction"]:
+                    if ai_result["confidence"] > bert_result["confidence"]:
+                        final_result["prediction"] = ai_result["prediction"]
+                        final_result["confidence"] = ai_result["confidence"]
+                        final_result["is_fake"] = ai_result["is_fake"]
+                        final_result["prediction_source"] = "gemini_ai"
             
-            # Validate against news sources
+            # STEP 3: Validate against news sources
             news_validation = news_validator.validate_claim(text)
             final_result = news_validator.enhance_prediction(final_result, ai_result, news_validation)
             results.append(final_result)

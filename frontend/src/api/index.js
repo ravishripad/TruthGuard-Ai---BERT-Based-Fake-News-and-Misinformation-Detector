@@ -43,7 +43,7 @@ export const authAPI = {
 
 // Prediction API
 export const predictionAPI = {
-  predict: (text) => api.post('/predict', { text }),
+  predict: (title, text = null) => api.post('/predict', { title, text }),
   batchPredict: (texts) => api.post('/batch-predict', texts),
 };
 

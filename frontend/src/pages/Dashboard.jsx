@@ -22,7 +22,8 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
-  const [newsText, setNewsText] = useState('');
+  const [title, setTitle] = useState('');
+  const [articleText, setArticleText] = useState('');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -55,8 +56,8 @@ const Dashboard = () => {
   };
 
   const handleAnalyze = async () => {
-    if (!newsText.trim() || newsText.length < 10) {
-      setError('Please enter at least 10 characters');
+    if (!title.trim() || title.length < 5) {
+      setError('Please enter a title (at least 5 characters)');
       return;
     }
 
@@ -66,7 +67,7 @@ const Dashboard = () => {
     const startTime = Date.now();
 
     try {
-      const response = await predictionAPI.predict(newsText);
+      const response = await predictionAPI.predict(title, articleText || null);
       setResult(response.data);
       setAnalysisTime(((Date.now() - startTime) / 1000).toFixed(1));
       loadHistory();
@@ -79,9 +80,9 @@ const Dashboard = () => {
   };
 
   const sampleTexts = [
-    "The President announced new climate policies that will reduce carbon emissions by 50% by 2030.",
-    "Scientists discover that drinking hot water cures all viral infections instantly.",
-    "NASA confirms that a new asteroid will pass safely by Earth next month."
+    { title: "The President announced new climate policies", text: "The new policies will reduce carbon emissions by 50% by 2030, according to official statements." },
+    { title: "Scientists discover hot water cures all viral infections", text: "A viral social media post claims drinking hot water instantly cures all viruses." },
+    { title: "NASA confirms asteroid will pass by Earth", text: "NASA officials confirmed that the asteroid will pass safely by Earth next month at a distance of 2 million miles." }
   ];
 
   const COLORS = ['#ef4444', '#22c55e'];
@@ -162,10 +163,10 @@ const Dashboard = () => {
               <div className="mb-4">
                 <p className="text-sm text-slate-500 mb-2">Try a sample:</p>
                 <div className="flex flex-wrap gap-2">
-                  {sampleTexts.map((text, i) => (
+                  {sampleTexts.map((sample, i) => (
                     <button
                       key={i}
-                      onClick={() => setNewsText(text)}
+                      onClick={() => { setTitle(sample.title); setArticleText(sample.text); }}
                       className="text-xs px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-400 hover:text-white transition border border-slate-600"
                     >
                       Sample {i + 1}
@@ -174,20 +175,36 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              <textarea
-                value={newsText}
-                onChange={(e) => setNewsText(e.target.value)}
-                placeholder="Paste or type a news article here to verify its authenticity..."
-                className="w-full h-40 p-4 bg-slate-900 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
-              />
+              {/* Title Input */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-slate-400 mb-2">News Title / Headline *</label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Enter the news headline..."
+                  className="w-full p-4 bg-slate-900 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Article Text Input */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-slate-400 mb-2">Article Text (Optional - improves accuracy)</label>
+                <textarea
+                  value={articleText}
+                  onChange={(e) => setArticleText(e.target.value)}
+                  placeholder="Paste the full article content for better analysis..."
+                  className="w-full h-32 p-4 bg-slate-900 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                />
+              </div>
               
               <div className="flex items-center justify-between mt-4">
                 <span className="text-sm text-slate-500">
-                  {newsText.length} characters
+                  Title: {title.length} chars | Text: {articleText.length} chars
                 </span>
                 <button
                   onClick={handleAnalyze}
-                  disabled={loading || newsText.length < 10}
+                  disabled={loading || title.length < 5}
                   className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-cyan-500 to-purple-500 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-purple-500/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? (
