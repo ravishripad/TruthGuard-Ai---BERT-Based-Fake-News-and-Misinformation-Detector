@@ -189,6 +189,8 @@ $RECYCLE.BIN/
 # Logs and Databases
 # =================================
 *.log
+logs/*.log
+logs/*.log.*
 *.sql
 *.sqlite
 *.db

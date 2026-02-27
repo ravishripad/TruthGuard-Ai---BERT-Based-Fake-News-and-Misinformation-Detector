@@ -2,14 +2,197 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: 'Inter', sans-serif;
+/* ─────────────────────────────────────────────────────────
+   TruthLens — Minimal Gradient Design System
+   ───────────────────────────────────────────────────────── */
+
+/* ── Base ─────────────────────────────────────────────── */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-y: scroll;
+    overscroll-behavior: none;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-dark-950 text-dark-200 font-sans;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99,102,241,.08), transparent),
+      radial-gradient(ellipse 60% 40% at 80% 100%, rgba(56,189,248,.04), transparent);
+    background-attachment: fixed;
+  }
+
+  ::selection {
+    @apply bg-accent/30 text-white;
+  }
 }
 
-.gradient-bg {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+/* ── Components ───────────────────────────────────────── */
+@layer components {
+
+  /* ---------- Glass panels ---------- */
+  .glass {
+    @apply bg-dark-900/70 backdrop-blur-xl;
+  }
+
+  .glass-card {
+    @apply bg-gradient-to-br from-dark-800/60 to-dark-900/40 backdrop-blur-xl
+           border border-white/[0.06] rounded-2xl;
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.03) inset,
+      0 2px 20px rgba(0,0,0,0.25);
+  }
+
+  .glass-card-dim {
+    @apply bg-gradient-to-br from-dark-800/25 to-dark-900/15 backdrop-blur-xl
+           border border-white/[0.05] rounded-2xl;
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.02) inset,
+      0 2px 20px rgba(0,0,0,0.18);
+  }
+
+  .glass-card-hover {
+    @apply glass-card transition-all duration-300;
+  }
+  .glass-card-hover:hover {
+    @apply border-white/[0.1];
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.06) inset,
+      0 8px 40px rgba(0,0,0,0.35),
+      0 0 60px -20px rgba(99,102,241,0.15);
+    transform: translateY(-2px);
+  }
+
+  /* ---------- Gradient text ---------- */
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-white via-dark-200 to-dark-400;
+  }
+
+  .text-gradient-accent {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, #818cf8 0%, #38bdf8 50%, #a78bfa 100%);
+  }
+
+  .text-gradient-glow {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, #e2e8f0 0%, #818cf8 50%, #38bdf8 100%);
+  }
+
+  /* ---------- Buttons ---------- */
+  .btn-primary {
+    @apply relative overflow-hidden px-7 py-3 rounded-xl font-semibold text-sm text-white
+           transition-all duration-300;
+    background: linear-gradient(135deg, #6366f1 0%, #818cf8 50%, #6366f1 100%);
+    background-size: 200% 200%;
+    animation: shimmer-bg 3s ease-in-out infinite;
+    box-shadow:
+      0 2px 16px rgba(99,102,241,0.3),
+      0 0 0 1px rgba(129,140,248,0.2) inset;
+  }
+  .btn-primary:hover {
+    box-shadow:
+      0 4px 24px rgba(99,102,241,0.45),
+      0 0 0 1px rgba(129,140,248,0.4) inset;
+    transform: translateY(-1px);
+  }
+  .btn-primary:active {
+    transform: translateY(0);
+  }
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .btn-ghost {
+    @apply px-7 py-3 rounded-xl font-semibold text-sm text-dark-300
+           border border-white/[0.08] transition-all duration-300
+           hover:border-white/[0.15] hover:text-white hover:bg-white/[0.04];
+  }
+
+  /* ---------- Inputs ---------- */
+  .input-dark {
+    @apply w-full px-4 py-3.5 bg-dark-900/70 border border-white/[0.08] rounded-xl
+           text-white text-sm placeholder-dark-500
+           transition-all duration-200
+           focus:outline-none focus:border-accent/40 focus:ring-2 focus:ring-accent/10
+           focus:bg-dark-900/90;
+  }
+
+  /* ---------- Dividers ---------- */
+  .divider-gradient {
+    @apply h-px w-full;
+    background: linear-gradient(90deg, transparent 0%, rgba(129,140,248,0.2) 50%, transparent 100%);
+  }
+
+  .divider-glow {
+    @apply h-px w-full max-w-lg mx-auto;
+    background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(99,102,241,0.15) 20%,
+      rgba(129,140,248,0.35) 50%,
+      rgba(56,189,248,0.15) 80%,
+      transparent 100%
+    );
+  }
+
+  /* ---------- Card shadow ---------- */
+  .card-shadow {
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.03) inset,
+      0 4px 24px rgba(0,0,0,0.3);
+  }
+
+  /* ---------- Mesh gradient background ---------- */
+  .mesh-gradient {
+    background:
+      radial-gradient(at 30% 20%, rgba(99,102,241,0.12) 0%, transparent 50%),
+      radial-gradient(at 80% 80%, rgba(56,189,248,0.08) 0%, transparent 50%),
+      radial-gradient(at 10% 80%, rgba(167,139,250,0.06) 0%, transparent 50%);
+  }
+
+  /* ---------- Grid pattern ---------- */
+  .grid-pattern {
+    background-image:
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  /* ---------- Skeleton loaders ---------- */
+  .skeleton {
+    @apply rounded-lg;
+    background: linear-gradient(90deg,
+      rgba(255,255,255,0.04) 25%,
+      rgba(255,255,255,0.08) 50%,
+      rgba(255,255,255,0.04) 75%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.8s ease-in-out infinite;
+  }
 }
 
-.card-shadow {
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+/* ── Keyframes ────────────────────────────────────────── */
+@keyframes shimmer-bg {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+
+@keyframes skeleton-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ── Scrollbar ────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.08);
+  border-radius: 100px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.14);
 }

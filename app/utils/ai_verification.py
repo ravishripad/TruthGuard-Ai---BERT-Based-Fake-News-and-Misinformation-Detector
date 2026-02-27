@@ -14,7 +14,7 @@ class AIFactChecker:
         if api_key and api_key != 'your_api_key_here' and len(api_key) > 10:
             try:
                 genai.configure(api_key=api_key)
-                self.model = genai.GenerativeModel('gemini-2.5-flash')
+                self.model = genai.GenerativeModel('gemini-flash-latest')
                 self.enabled = True
                 print("✓ Gemini AI initialized successfully")
             except Exception as e:

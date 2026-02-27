@@ -7,7 +7,9 @@ from app.utils.news_validator import news_validator
 from app.utils.image_ocr import image_ocr
 from app.auth import get_current_user
 from app.database import get_predictions_collection
+from app.utils.logger import get_logger
 
+logger = get_logger(__name__)
 router = APIRouter()
 
 @router.post("/predict", response_model=PredictionResponse)
@@ -27,6 +29,9 @@ async def predict(
         PredictionResponse with prediction label, confidence, and probabilities
     """
     try:
+        user_id = str(current_user["_id"])
+        logger.info("[predict] user=%s | title='%.80s'", user_id, request.title)
+
         # Format input: combine title and text with [SEP] like training data
         if request.text:
             formatted_input = f"{request.title} [SEP] {request.text}"
@@ -85,9 +90,17 @@ async def predict(
             "created_at": datetime.utcnow()
         }
         await predictions_collection.insert_one(prediction_record)
-        
+
+        logger.info(
+            "[predict] DONE user=%s | result=%s | confidence=%.2f | source=%s",
+            user_id,
+            final_result["prediction"].upper(),
+            final_result["confidence"],
+            final_result.get("prediction_source", "unknown"),
+        )
         return final_result
     except Exception as e:
+        logger.error("[predict] ERROR user=%s | %s", str(current_user.get("_id", "?")), e, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
 
 @router.post("/batch-predict")
@@ -107,6 +120,8 @@ async def batch_predict(
         List of predictions
     """
     try:
+        user_id = str(current_user["_id"])
+        logger.info("[batch-predict] user=%s | count=%d", user_id, len(texts))
         model, tokenizer, checkpoint = get_model()
         results = []
         predictions_collection = get_predictions_collection()
@@ -150,8 +165,10 @@ async def batch_predict(
             }
             await predictions_collection.insert_one(prediction_record)
         
+        logger.info("[batch-predict] DONE user=%s | processed=%d", user_id, len(results))
         return {"predictions": results}
     except Exception as e:
+        logger.error("[batch-predict] ERROR user=%s | %s", str(current_user.get("_id", "?")), e, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Batch prediction error: {str(e)}")
 
 
@@ -171,6 +188,8 @@ async def image_predict(
         Dict with extracted text and prediction results
     """
     try:
+        user_id = str(current_user["_id"])
+        logger.info("[image-predict] user=%s | mime=%s", user_id, request.mime_type)
         # Step 1: Extract text from image using OCR
         if not image_ocr.enabled:
             raise HTTPException(status_code=503, detail="Image OCR service not available. Check AI API key.")
@@ -253,12 +272,19 @@ async def image_predict(
             "created_at": datetime.utcnow()
         }
         await predictions_collection.insert_one(prediction_record)
-        
+
+        logger.info(
+            "[image-predict] DONE user=%s | title='%.60s' | result=%s | confidence=%.2f",
+            user_id, title,
+            final_result["prediction"].upper(),
+            final_result["confidence"],
+        )
         return final_result
         
     except HTTPException:
         raise
     except Exception as e:
+        logger.error("[image-predict] ERROR user=%s | %s", str(current_user.get("_id", "?")), e, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Image prediction error: {str(e)}")
 
 

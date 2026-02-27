@@ -1,20 +1,32 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import Home from './pages/Home';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
+import { pageTransition } from './motion/config';
+
+// Route-level code splitting
+const Home      = lazy(() => import('./pages/Home'));
+const Login     = lazy(() => import('./pages/Login'));
+const Register  = lazy(() => import('./pages/Register'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+
+// Shared loading spinner
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center bg-dark-950">
+    <div className="absolute inset-0 mesh-gradient opacity-50" />
+    <div className="relative flex flex-col items-center gap-5">
+      <div className="w-12 h-12 rounded-full border-[3px] border-white/[0.08] border-t-accent animate-spin" />
+      <p className="text-sm text-dark-400 font-medium tracking-wide">Loading…</p>
+    </div>
+  </div>
+);
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
   
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-      </div>
-    );
+    return <PageLoader />;
   }
   
   if (!user) {
@@ -29,11 +41,7 @@ const PublicRoute = ({ children }) => {
   const { user, loading } = useAuth();
   
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-      </div>
-    );
+    return <PageLoader />;
   }
   
   if (user) {
@@ -43,31 +51,44 @@ const PublicRoute = ({ children }) => {
   return children;
 };
 
+// Animated route wrapper
+const PageWrapper = ({ children }) => (
+  <motion.div {...pageTransition} style={{ willChange: 'transform, opacity, filter' }}>
+    {children}
+  </motion.div>
+);
+
 function AppRoutes() {
+  const location = useLocation();
+
   return (
-    <Routes>
-      <Route path="/" element={
-        <PublicRoute>
-          <Home />
-        </PublicRoute>
-      } />
-      <Route path="/login" element={
-        <PublicRoute>
-          <Login />
-        </PublicRoute>
-      } />
-      <Route path="/register" element={
-        <PublicRoute>
-          <Register />
-        </PublicRoute>
-      } />
-      <Route path="/dashboard" element={
-        <ProtectedRoute>
-          <Dashboard />
-        </ProtectedRoute>
-      } />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <AnimatePresence mode="wait">
+      <Suspense fallback={<PageLoader />} key={location.pathname}>
+        <Routes location={location}>
+          <Route path="/" element={
+            <PublicRoute>
+              <PageWrapper><Home /></PageWrapper>
+            </PublicRoute>
+          } />
+          <Route path="/login" element={
+            <PublicRoute>
+              <PageWrapper><Login /></PageWrapper>
+            </PublicRoute>
+          } />
+          <Route path="/register" element={
+            <PublicRoute>
+              <PageWrapper><Register /></PageWrapper>
+            </PublicRoute>
+          } />
+          <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <PageWrapper><Dashboard /></PageWrapper>
+            </ProtectedRoute>
+          } />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+    </AnimatePresence>
   );
 }
 

@@ -10,7 +10,9 @@ from app.auth import (
     get_current_user,
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
+from app.utils.logger import get_logger
 
+logger = get_logger(__name__)
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
 
@@ -55,6 +57,7 @@ async def register(user_data: UserCreate):
     
     result = await users_collection.insert_one(new_user)
     user_id = str(result.inserted_id)
+    logger.info("[register] New user: id=%s | username=%s | email=%s", user_id, user_data.username, user_data.email)
     
     # Create access token
     access_token = create_access_token(
@@ -90,6 +93,7 @@ async def login(credentials: UserLogin):
     user = await users_collection.find_one({"email": credentials.email})
     
     if not user:
+        logger.warning("[login] FAILED (unknown email) | email=%s", credentials.email)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
@@ -98,6 +102,7 @@ async def login(credentials: UserLogin):
     
     # Verify password
     if not verify_password(credentials.password, user["hashed_password"]):
+        logger.warning("[login] FAILED (wrong password) | email=%s", credentials.email)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
@@ -113,6 +118,7 @@ async def login(credentials: UserLogin):
     
     # Create access token
     user_id = str(user["_id"])
+    logger.info("[login] SUCCESS | id=%s | username=%s | email=%s", user_id, user["username"], user["email"])
     access_token = create_access_token(
         data={"sub": user_id, "email": user["email"]},
         expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -208,4 +214,5 @@ async def logout(current_user: dict = Depends(get_current_user)):
     """
     Logout current user (client should discard the token).
     """
+    logger.info("[logout] user=%s | username=%s", str(current_user["_id"]), current_user.get("username"))
     return {"message": "Successfully logged out"}

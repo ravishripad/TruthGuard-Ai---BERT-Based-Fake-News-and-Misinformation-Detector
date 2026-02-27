@@ -1,6 +1,6 @@
-# 🛡️ TruthLens - AI-Powered Fake News Detector
+# 🛡️ TruthLens — AI-Powered Fake News Detector
 
-A full-stack web application for detecting fake news using a fine-tuned BERT model with AI-powered verification, real-time news source validation, and MongoDB-based user authentication.
+A full-stack web application that detects fake news using a fine-tuned BERT transformer model, multi-layer AI verification, real-time news source validation, image OCR analysis, and a fully animated React interface with MongoDB-backed user authentication.
 
 ![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)
@@ -9,78 +9,141 @@ A full-stack web application for detecting fake news using a fine-tuned BERT mod
 ![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.3+-38B2AC.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
+---
+
 ## ✨ Features
 
-- 🤖 **Fine-tuned BERT Model** - Binary classification (Real/Fake) trained on LIAR dataset with 95%+ accuracy
-- 🔐 **User Authentication** - Secure JWT-based auth with MongoDB Atlas
-- 📊 **Interactive Dashboard** - Modern React UI with real-time analysis and pie charts
-- 📈 **Prediction History** - Track all your previous fact-checks
-- 📰 **Real-time News Sources** - Cross-reference with Google News RSS, NewsAPI, and SerpAPI
-- 🎨 **Modern Dark UI** - Beautiful dark theme with gradient accents
-- 📱 **Responsive Design** - Works seamlessly on desktop and mobile
+### Core Detection
+- **BERT-Based Classification** — Fine-tuned transformer model achieving 95%+ accuracy on binary fake/real classification
+- **Confidence Scoring** — Per-prediction probability distribution (fake vs real) visualised as a live pie chart
+- **Multi-Layer AI Verification** — Secondary AI cross-check that cross-references the BERT output for improved reliability
+- **Batch Analysis** — Submit multiple news texts in one request
+
+### News Source Validation
+- **Google News RSS** — Free real-time headline matching (no API key required)
+- **NewsAPI Integration** — Extended article lookup with source attribution
+- **SerpAPI Integration** — Fallback search-engine news verification
+- **Contextual Insights** — Human-readable summary of whether the claim was corroborated
+
+### Image & OCR
+- **Screenshot Upload** — Paste or upload a screenshot of a news headline/article
+- **Automatic Text Extraction** — OCR pipeline extracts text from the image before running it through the classifier
+
+### Authentication & History
+- **JWT Authentication** — 24-hour access tokens, bcrypt-hashed passwords
+- **Prediction History** — Every analysis stored with timestamp and label in MongoDB
+- **User Dashboard** — Live stats, streak counter, accuracy breakdown
+
+### Developer Experience
+- **Rotating Log Files** — All API activity written to `logs/app.log` (10 MB cap, 5 backups)
+- **Swagger / ReDoc** — Auto-generated interactive API docs at `/docs` and `/redoc`
+- **Environment-Driven Config** — Feature flags via `.env` (AI check, news APIs, model path)
+
+### Frontend Animations
+- **Animated SVG Backgrounds** — Page-specific particle systems, orbit rings, ripple hexagons, and star fields
+- **GSAP ScrollTrigger** — Cinematic slow-scroll storytelling on the How It Works section
+- **Framer Motion Transitions** — Blur + scale page transitions between routes
+- **Glassmorphism UI** — Layered `glass-card` and `glass-card-dim` surfaces with backdrop blur
+
+---
 
 ## 🏗️ Architecture
 
 ```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   React + Vite  │────▶│   FastAPI       │────▶│  MongoDB Atlas  │
-│   TailwindCSS   │     │   (Backend)     │     │   (Database)    │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
-                               │
-                    ┌──────────┴──────────┐
-                    │                     │
-              ┌─────▼─────┐         ┌─────▼─────┐
-              │   BERT    │         │Google News│
-              │   Model   │         │    RSS    │
-              └───────────┘         └───────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                         FRONTEND (React + Vite)                 │
+│  Home  │  Login  │  Register  │  Dashboard                      │
+│  GSAP ScrollTrigger · Framer Motion · TailwindCSS · Recharts    │
+└────────────────────────────┬────────────────────────────────────┘
+                             │ HTTP / JWT
+┌────────────────────────────▼────────────────────────────────────┐
+│                       BACKEND (FastAPI)                         │
+│  /api/predict   /api/batch-predict   /api/auth/*                │
+│  Logging Middleware → logs/app.log (RotatingFileHandler)        │
+└──────┬──────────────────────┬──────────────────────┬────────────┘
+       │                      │                      │
+┌──────▼──────┐   ┌───────────▼──────────┐  ┌───────▼─────────────┐
+│ BERT Model  │   │  News Validator       │ │  AI Verification    │
+│ (PyTorch +  │   │  Google News RSS      │ │  Multi-layer cross  │
+│ Transformers│   │  NewsAPI · SerpAPI    │ │  check layer        │
+│ ~95% acc.)  │   └──────────────────────┘  └─────────────────────┘
+└──────┬──────┘
+       │
+┌──────▼──────────────────────────────────────────────────────────┐
+│                    MongoDB Atlas (Motor async)                  │
+│          users collection · predictions collection              │
+└─────────────────────────────────────────────────────────────────┘
 ```
+
+---
 
 ## 📁 Project Structure
 
 ```
-TruthLens/
-├── app/                          # FastAPI Backend
+FinalYearProject/
+├── app/
+│   ├── main.py              # FastAPI app, CORS, logging middleware
+│   ├── auth.py              # JWT token logic, bcrypt helpers
+│   ├── database.py          # Motor async MongoDB client
 │   ├── api/
-│   │   ├── routes.py            # Prediction endpoints (protected)
-│   │   └── auth_routes.py       # Authentication endpoints
+│   │   ├── routes.py        # Prediction endpoints (/api/predict, /api/batch-predict)
+│   │   └── auth_routes.py   # Auth endpoints (/api/auth/*)
 │   ├── models/
-│   │   └── bert_model.py        # BERT model inference
+│   │   └── bert_model.py    # BERT inference wrapper (PyTorch)
 │   ├── schemas/
-│   │   ├── prediction.py        # Prediction schemas
-│   │   └── auth.py              # Auth schemas
-│   ├── utils/
-│   │   ├── ai_verification.py   # AI cross-verification
-│   │   └── news_validator.py    # News source validation (Google News RSS)
-│   ├── auth.py                  # JWT & bcrypt password handling
-│   ├── database.py              # MongoDB async connection
-│   └── main.py                  # FastAPI application
-├── frontend/                     # React Frontend
+│   │   ├── prediction.py    # Pydantic request/response models
+│   │   └── auth.py          # User & token schemas
+│   └── utils/
+│       ├── news_validator.py # Multi-source news validation
+│       ├── ai_verification.py# Secondary AI verification layer
+│       ├── image_ocr.py      # Image upload + text extraction
+│       └── logger.py         # RotatingFileHandler logger factory
+├── enhanced_bert_liar_model/ # Fine-tuned weights + tokenizer
+│   ├── model.pth
+│   ├── tokenizer.json
+│   ├── tokenizer_config.json
+│   ├── special_tokens_map.json
+│   └── vocab.txt
+├── enhanced_bert_welfake_model/ # Alternative WELFake model weights
+│   ├── model.pth
+│   ├── tokenizer.json
+│   ├── tokenizer_config.json
+│   └── vocab.txt
+├── frontend/
 │   ├── src/
-│   │   ├── api/                 # Axios API client
-│   │   │   └── index.js
-│   │   ├── context/             # React Context
-│   │   │   └── AuthContext.jsx  # Auth state management
-│   │   ├── pages/
-│   │   │   ├── Home.jsx         # Landing page with branding
-│   │   │   ├── Login.jsx        # Login page (dark theme)
-│   │   │   ├── Register.jsx     # Registration page
-│   │   │   └── Dashboard.jsx    # Main analysis dashboard
-│   │   ├── App.jsx              # Router & protected routes
-│   │   ├── main.jsx             # Entry point
-│   │   └── index.css            # TailwindCSS styles
-│   ├── package.json
+│   │   ├── App.jsx           # Router + PageWrapper (Framer Motion)
+│   │   ├── index.css         # Global styles, glass-card, glass-card-dim
+│   │   ├── main.jsx
+│   │   ├── api/index.js      # Axios instance + interceptors
+│   │   ├── context/
+│   │   │   └── AuthContext.jsx
+│   │   ├── motion/
+│   │   │   ├── config.js     # pageTransition variants
+│   │   │   ├── reveal.js     # Scroll-reveal helpers
+│   │   │   ├── scroll.js     # GSAP ScrollTrigger utilities
+│   │   │   └── useReducedMotion.js
+│   │   └── pages/
+│   │       ├── Home.jsx      # Landing page, GSAP slow-scroll steps
+│   │       ├── Dashboard.jsx # Analysis UI, history, charts
+│   │       ├── Login.jsx     # Auth page, orbit-ring SVG background
+│   │       └── Register.jsx  # Auth page, hexagon ripple SVG bg
+│   ├── index.html
 │   ├── vite.config.js
 │   ├── tailwind.config.js
-│   └── postcss.config.js
-├── enhanced_bert_liar_model/     # Fine-tuned BERT model
-│   ├── model.pth                # Model weights
-│   ├── tokenizer.json           # Tokenizer
-│   └── vocab.txt                # Vocabulary
-├── .env                          # Environment variables
-├── pyproject.toml               # Python dependencies (UV)
-├── run_api.py                   # Backend entry point
+│   └── package.json
+├── logs/                     # Auto-created on first run
+│   └── app.log               # Rotating log (10 MB, 5 backups)
+├── Data/
+│   └── WELFake_Dataset.csv
+├── Notebook/
+│   ├── bert_finetune_notebook.ipynb
+│   └── wel-fakebert-finetune-notebook.ipynb
+├── run_api.py                # Uvicorn entry point
+├── pyproject.toml            # Python dependencies (UV)
 └── README.md
 ```
+
+---
 
 ## 🚀 Quick Start
 
@@ -88,124 +151,104 @@ TruthLens/
 
 - Python 3.9+
 - Node.js 18+
-- MongoDB (local or Atlas)
-- UV package manager (recommended)
+- [UV](https://github.com/astral-sh/uv) package manager
+- MongoDB Atlas account (free tier is sufficient)
 
-### 1. Clone & Setup Backend
+### 1. Install Backend
 
 ```bash
-# Navigate to project
-cd TrueLens
+# Clone the repository
+git clone <your-repo-url>
+cd FinalYearProject
 
-# Create virtual environment
-python -m venv .venv
+# Install UV if you haven't already
+pip install uv
 
-# Activate (Windows)
-.venv\Scripts\activate
-
-# Install dependencies
+# Install all Python dependencies
 uv pip install -e .
 ```
 
 ### 2. Configure Environment
 
-Create a `.env` file in the root directory:
+Create a `.env` file in the project root:
 
 ```env
-# AI Verification (Optional)
-AI_API_KEY=your_ai_api_key
-
-# API Configuration
-API_HOST=0.0.0.0
-API_PORT=8000
-
-# Model Configuration
-MODEL_PATH=./enhanced_bert_liar_model
-MAX_LENGTH=512
-
-# Enable AI Cross-Check
-ENABLE_AI_CHECK=true
-
-# News Validation APIs (Optional - Google News RSS is free)
-NEWSAPI_KEY=your_newsapi_key
-SERPAPI_KEY=your_serpapi_key
-
 # MongoDB Atlas
 MONGODB_URL=mongodb+srv://username:password@cluster.mongodb.net/?retryWrites=true&w=majority
 DATABASE_NAME=fake_news_detector
 
-# JWT Configuration
+# JWT
 JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
+
+# Model
+MODEL_PATH=./enhanced_bert_liar_model
+MAX_LENGTH=512
+
+# AI Verification (optional — enables secondary cross-check)
+ENABLE_AI_CHECK=true
+AI_API_KEY=your_ai_api_key
+
+# News Validation APIs (optional — Google News RSS works without a key)
+NEWSAPI_KEY=your_newsapi_key
+SERPAPI_KEY=your_serpapi_key
+
+# Server
+API_HOST=0.0.0.0
+API_PORT=8000
 ```
 
-### 3. Start Backend
+### 3. Start the Backend
 
 ```bash
 python run_api.py
 ```
 
-API will be available at: http://localhost:8000
+API available at **http://localhost:8000**  
+Swagger docs at **http://localhost:8000/docs**
 
-### 4. Setup Frontend
+### 4. Start the Frontend
 
 ```bash
 cd frontend
-
-# Install dependencies
 npm install
-
-# Start development server
 npm run dev
 ```
 
-Frontend will be available at: http://localhost:5173
+Frontend available at **http://localhost:5173**
 
-## 🖥️ Screenshots
+---
 
-### Homepage
-- Clean landing page with TruthLens branding and Shield logo
-- Feature highlights and statistics
-- Easy navigation to login/register
-
-### Dashboard
-- News text input with sample texts
-- Real-time AI analysis with confidence scores
-- Pie chart visualization of fake/real probabilities
-- Related news sources with clickable links
-- User stats and prediction history
-
-## 🔐 API Endpoints
+## 🔐 API Reference
 
 ### Authentication
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/auth/register` | Register new user |
-| POST | `/api/auth/login` | Login and get JWT token |
-| GET | `/api/auth/me` | Get current user info |
-| GET | `/api/auth/history` | Get prediction history |
-| POST | `/api/auth/logout` | Logout (client-side) |
+| `POST` | `/api/auth/register` | Create a new user account |
+| `POST` | `/api/auth/login` | Login and receive a JWT token |
+| `GET` | `/api/auth/me` | Get current authenticated user |
+| `GET` | `/api/auth/history` | Retrieve prediction history |
+| `POST` | `/api/auth/logout` | Logout (client-side token removal) |
 
-### Predictions (Requires Auth)
+### Predictions (JWT required)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/predict` | Analyze single news text |
-| POST | `/api/batch-predict` | Analyze multiple texts |
+| `POST` | `/api/predict` | Analyse a single news text |
+| `POST` | `/api/batch-predict` | Analyse multiple texts in one call |
 
-### Example Request
+### Example — Single Prediction
 
+**Request:**
 ```bash
-# Predict (with token)
 curl -X POST http://localhost:8000/api/predict \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"text": "Scientists discover new planet in solar system"}'
 ```
 
-### Example Response
-
+**Response:**
 ```json
 {
   "text": "Scientists discover new planet in solar system",
@@ -217,207 +260,207 @@ curl -X POST http://localhost:8000/api/predict \
   },
   "is_fake": true,
   "news_validation": {
-    "verification_status": "found",
-    "total_results": 5,
-    "articles": [
-      {
-        "title": "NASA Confirms No New Planet Discovery",
-        "source": "Space.com",
-        "url": "https://...",
-        "published_at": "2025-12-05T10:30:00Z"
-      }
-    ]
+    "verification_status": "not_found",
+    "total_results": 0,
+    "articles": []
   },
-  "news_insight": "✓ Confirmed by multiple news sources."
+  "news_insight": "⚠ No corroborating news sources found."
 }
 ```
+
+---
 
 ## 🔧 Technology Stack
 
 ### Backend
-- **FastAPI** - Modern async Python web framework
-- **Motor** - Async MongoDB driver
-- **PyTorch** - Deep learning framework
-- **Transformers** - Hugging Face BERT implementation
-- **python-jose** - JWT token handling
-- **bcrypt** - Password hashing
+| Library | Purpose |
+|---------|---------|
+| FastAPI | Async REST API framework |
+| Uvicorn | ASGI server |
+| PyTorch | BERT model inference |
+| Transformers (HuggingFace) | Tokeniser + model architecture |
+| Motor | Async MongoDB driver |
+| python-jose | JWT token generation & validation |
+| passlib[bcrypt] | Password hashing |
+| python-multipart | File / form upload support |
+| python-dotenv | `.env` config loading |
+| requests + beautifulsoup4 | News RSS scraping |
+| newsapi-python | NewsAPI client |
+| serpapi | SerpAPI client |
 
 ### Frontend
-- **React 18** - UI library
-- **Vite** - Fast build tool
-- **TailwindCSS** - Utility-first CSS
-- **Recharts** - Chart visualization
-- **Lucide React** - Icon library
-- **Axios** - HTTP client
+| Library | Purpose |
+|---------|---------|
+| React 18 | UI component library |
+| Vite | Build tool & dev server |
+| TailwindCSS 3 | Utility-first styling |
+| GSAP + ScrollTrigger | Scroll-driven animations |
+| Framer Motion | Page transition system |
+| Recharts | Pie chart visualisation |
+| Lucide React | Icon set |
+| Axios | HTTP client with interceptors |
 
-### Database
-- **MongoDB Atlas** - Cloud database
+### Infrastructure
+| Service | Purpose |
+|---------|---------|
+| MongoDB Atlas | Cloud database (users + predictions) |
+| Python logging (RotatingFileHandler) | Structured backend logs → `logs/app.log` |
 
-### AI/ML
-- **BERT** - Fine-tuned transformer model
-- **Google News RSS** - Real-time news validation (free)
+---
 
-## 🌐 Deployment Options
+## 🎨 Frontend Highlights
 
-### Option 1: Railway (Recommended - Easiest)
+### Animated Backgrounds
+- **Home** — Fixed star-field (21 particle nodes, 5 diagonal lines) that persists across scroll
+- **Login** — Two large orbit rings (r = 320, r = 390) with animated orbiting nodes and a purple scan line
+- **Register** — Corner hexagons and three concentric ripple rings expanding from center
+- **Dashboard** — Orbit ring system matching Login, with corner/edge glow nodes
 
-**Best for**: Quick deployment, includes free MongoDB
+### Scroll Animations (Home page)
+GSAP `ScrollTrigger` drives the "How It Works" steps section with individual triggers per step and `scrub: 3` on the connecting progress line, creating a deliberate slow-scroll narrative feel.
 
-1. **Sign up**: https://railway.app
-2. **New Project** → Deploy from GitHub
-3. **Add MongoDB**: New → Database → MongoDB
-4. **Configure environment variables** in Railway dashboard
-5. **Deploy!** 🚀
+### Page Transitions
+Framer Motion `pageTransition` variant applies a blur + scale (0.98 → 1) enter animation and blur + scale (1 → 0.99) exit, producing a cinematic feel between routes.
 
-**Cost**: Free tier available (500 hours/month)
+### Glassmorphism Cards
+Two card classes are available:
+- `glass-card` — Standard surface (60% / 40% opacity)
+- `glass-card-dim` — Subtle surface for content-heavy panels (25% / 15% opacity)
 
-### Option 2: Render + MongoDB Atlas
+---
 
-**Best for**: Production-ready deployment
+## 🤖 Model Details
 
-**Backend (Render):**
-1. Create account at https://render.com
-2. New → Web Service → Connect GitHub
-3. Build Command: `pip install -e .`
-4. Start Command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-
-**Frontend (Render):**
-1. New → Static Site → Connect GitHub
-2. Build Command: `cd frontend && npm install && npm run build`
-3. Publish Directory: `frontend/dist`
-
-**Database (MongoDB Atlas):**
-1. Create free cluster at https://mongodb.com/atlas
-2. Get connection string
-3. Add to Render environment variables
-
-**Cost**: Free tier for all services
-
-### Option 3: Vercel (Frontend) + Railway (Backend)
-
-**Best for**: Optimal frontend performance
-
-**Frontend (Vercel):**
-1. https://vercel.com
-2. Import from GitHub
-3. Auto-detects Vite settings
-4. Add `VITE_API_URL` environment variable
-
-**Backend (Railway):**
-1. Follow Railway steps above
-
-### Option 4: Docker + Any Cloud
-
-**Best for**: Full control, scalability
-
-```dockerfile
-# Dockerfile
-FROM python:3.11-slim
-WORKDIR /app
-COPY . .
-RUN pip install -e .
-EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-
-**Deploy to**:
-- Google Cloud Run (free tier)
-- AWS ECS/Fargate
-- Azure Container Apps
-- DigitalOcean App Platform
-
-### Option 5: Hugging Face Spaces
-
-**Best for**: ML demos
-
-1. Create Space at https://huggingface.co/spaces
-2. Select Gradio/Streamlit SDK
-3. Upload model and code
-4. Auto-deploys on push
-
-**Cost**: Completely free
-
-## 📊 Deployment Comparison
-
-| Platform | Ease | Cost | Scalability | Best For |
-|----------|------|------|-------------|----------|
-| Railway | ⭐⭐⭐⭐⭐ | Free-$5 | Medium | Quick start |
-| Render | ⭐⭐⭐⭐ | Free-$7 | Medium | Production |
-| Vercel + Railway | ⭐⭐⭐⭐ | Free | High | Performance |
-| HuggingFace | ⭐⭐⭐⭐⭐ | Free | Low | Demo |
-| Docker/Cloud | ⭐⭐ | Varies | Very High | Enterprise |
-
-## 🔧 Environment Variables
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `MONGODB_URL` | MongoDB connection string | ✅ |
-| `DATABASE_NAME` | Database name | ✅ |
-| `JWT_SECRET_KEY` | Secret for JWT tokens | ✅ |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | Token expiry (default: 1440) | ❌ |
-| `ENABLE_AI_CHECK` | Enable AI verification | ❌ |
-| `AI_API_KEY` | AI API key (optional) | ❌ |
-| `NEWSAPI_KEY` | NewsAPI key for validation | ❌ |
-| `SERPAPI_KEY` | SerpAPI key for validation | ❌ |
-
-## 🎯 Model Performance
-
-| Metric | Score |
-|--------|-------|
+| Property | Value |
+|----------|-------|
+| Architecture | BERT (bert-base-uncased) |
+| Training dataset | LIAR dataset (binary: real / fake) |
+| Max token length | 512 |
 | Accuracy | 95.2% |
 | Precision | 94.8% |
 | Recall | 95.5% |
 | F1 Score | 95.1% |
 
-Trained on the LIAR dataset with binary classification (Real/Fake).
+An alternative model fine-tuned on the **WELFake dataset** is also included under `enhanced_bert_welfake_model/`.
 
-## 🔒 Security Features
+---
 
-- JWT-based authentication with 24-hour expiry
-- Bcrypt password hashing
-- Protected API routes
-- CORS configuration
-- Input validation with Pydantic
+## 📊 Logging
 
-## 🧪 Testing
+All backend activity is written to `logs/app.log` via Python's `RotatingFileHandler`:
 
-```bash
-# Backend tests
-pytest
+- **Max file size**: 10 MB
+- **Backups**: 5 rotated files (`app.log.1` … `app.log.5`)
+- **What is logged**: HTTP request/response pairs, prediction results (user, label, confidence, source), auth events (register, login, logout, failures), startup/shutdown lifecycle
 
-# Frontend tests
-cd frontend && npm test
+---
+
+## 🔒 Security
+
+- JWT tokens with configurable expiry (default 24 hours)
+- Bcrypt password hashing (passlib)
+- CORS middleware (configurable origins)
+- Pydantic input validation on all endpoints
+- Environment-variable-driven secrets (no hardcoded credentials)
+
+---
+
+## 🌐 Deployment
+
+### Option 1 — Railway (Recommended)
+
+1. Push code to GitHub
+2. New Project on [Railway](https://railway.app) → Deploy from GitHub
+3. Add a MongoDB plugin or point `MONGODB_URL` at Atlas
+4. Set all required environment variables in the Railway dashboard
+5. Deploy — Railway auto-detects the `run_api.py` start command
+
+### Option 2 — Render + MongoDB Atlas
+
+**Backend (Render Web Service):**
+- Build Command: `pip install uv && uv pip install -e .`
+- Start Command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+
+**Frontend (Render Static Site):**
+- Build Command: `cd frontend && npm install && npm run build`
+- Publish Directory: `frontend/dist`
+
+### Option 3 — Vercel (frontend) + Railway (backend)
+
+Add a `VITE_API_URL` environment variable in Vercel pointing to the Railway backend URL.
+
+### Option 4 — Docker
+
+```dockerfile
+FROM python:3.11-slim
+WORKDIR /app
+COPY . .
+RUN pip install uv && uv pip install -e .
+EXPOSE 8000
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
+
+---
+
+## 🔧 Environment Variables Reference
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `MONGODB_URL` | ✅ | MongoDB Atlas connection string |
+| `DATABASE_NAME` | ✅ | Target database name |
+| `JWT_SECRET_KEY` | ✅ | Secret used to sign JWT tokens |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | ❌ | Token TTL (default: 1440) |
+| `MODEL_PATH` | ❌ | Path to BERT model dir (default: `./enhanced_bert_liar_model`) |
+| `MAX_LENGTH` | ❌ | Tokeniser max length (default: 512) |
+| `ENABLE_AI_CHECK` | ❌ | Enable secondary AI verification (default: false) |
+| `AI_API_KEY` | ❌ | API key for secondary AI verification service |
+| `NEWSAPI_KEY` | ❌ | [NewsAPI](https://newsapi.org) key |
+| `SERPAPI_KEY` | ❌ | [SerpAPI](https://serpapi.com) key |
+| `API_HOST` | ❌ | Bind address (default: `0.0.0.0`) |
+| `API_PORT` | ❌ | Port (default: `8000`) |
+
+---
 
 ## 📝 API Documentation
 
-Once the backend is running, visit:
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+With the backend running, interactive docs are available at:
+
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
+
+---
+
+## 🧪 Training Notebooks
+
+| Notebook | Description |
+|----------|-------------|
+| `Notebook/bert_finetune_notebook.ipynb` | BERT fine-tuning on the LIAR dataset |
+| `Notebook/wel-fakebert-finetune-notebook.ipynb` | BERT fine-tuning on the WELFake dataset |
+
+---
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
+2. Create a feature branch: `git checkout -b feature/my-feature`
+3. Commit your changes: `git commit -m "feat: add my feature"`
+4. Push the branch: `git push origin feature/my-feature`
 5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 👨‍💻 Author
-
-**TruthLens** - AI-Powered Fake News Detection System
-
-## 🙏 Acknowledgments
-
-- [LIAR Dataset](https://www.cs.ucsb.edu/~william/data/liar_dataset.zip) for training data
-- [Hugging Face](https://huggingface.co/) for BERT implementation
 
 ---
 
-<p align="center">
-  🛡️ Made with ❤️ for fighting misinformation
-</p>
+## 📄 License
+
+This project is licensed under the **MIT License**.
+
+---
+
+## 🙏 Acknowledgements
+
+- [LIAR Dataset](https://www.cs.ucsb.edu/~william/data/liar_dataset.zip) — W. Wang, 2017
+- [WELFake Dataset](https://zenodo.org/record/4561253) — Verma et al., 2021
+- [Hugging Face Transformers](https://huggingface.co/) — BERT tokeniser and model utilities
+
+---
+
+<p align="center">🛡️ Built to fight misinformation — TruthLens</p>
