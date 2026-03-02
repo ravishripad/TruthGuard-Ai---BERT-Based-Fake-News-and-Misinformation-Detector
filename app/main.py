@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import os
 import time
 from app.api import routes, auth_routes
 from app.database import connect_to_mongodb, close_mongodb_connection
@@ -28,16 +29,16 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configure CORS - update origins for production
+# Configure CORS – reads ALLOWED_ORIGINS from env (comma-separated) for production
+_raw_origins = os.getenv(
+    "ALLOWED_ORIGINS",
+    "http://localhost,http://localhost:80,http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173"
+)
+_allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",      # React dev server
-        "http://localhost:5173",      # Vite dev server
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173",
-        "*"                           # Remove in production
-    ],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

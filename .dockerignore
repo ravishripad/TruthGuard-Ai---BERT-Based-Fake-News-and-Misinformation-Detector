@@ -1,0 +1,43 @@
+# Backend .dockerignore
+# Exclude files that are not needed in the Docker image
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Development data / notebooks
+Data/
+Notebook/
+
+# Git
+.git/
+.gitignore
+
+# Docker files (not needed inside the container)
+Dockerfile
+docker-compose.yml
+frontend/
+
+# Logs (mounted as a volume)
+logs/
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Environment files (injected at runtime)
+.env
+.env.*
+!.env.example
