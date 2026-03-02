@@ -51,28 +51,32 @@ class AIFactChecker:
         """
         print(f"[Gemini raw response]:\n{text_response}\n---")
 
-        # Strict match: look for CLASSIFICATION line and extract the LAST word
-        # which should be exactly REAL or FAKE
+        # Strict match: look for CLASSIFICATION line
+        # Valid values: REAL, FAKE, UNVERIFIED (UNVERIFIED → treated as REAL with capped confidence)
         classification = "real"  # default — bias toward real to avoid over-flagging
+        unverified = False
         for line in text_response.split('\n'):
             if 'CLASSIFICATION' in line.upper():
-                # Extract the classification value after the colon
                 after_colon = line.split(':', 1)[-1].strip().upper()
-                # Check for FAKE strictly — must appear as a standalone word at the end
-                # "FAKE" matches, "NOT FAKE" → skip (NOT comes before FAKE)
-                # Use word-boundary regex so REAL wins if both appear
                 if re.search(r'\bFAKE\b', after_colon) and not re.search(r'\bNOT\s+FAKE\b', after_colon):
                     classification = "fake"
+                elif re.search(r'\b(UNVERIFIED|UNCERTAIN|UNCLEAR|MISLEADING)\b', after_colon):
+                    # UNVERIFIED = can't confirm but can't deny → give benefit of the doubt
+                    classification = "real"
+                    unverified = True
                 elif re.search(r'\bREAL\b', after_colon):
                     classification = "real"
                 break
 
-        confidence = 0.75
+        # UNVERIFIED gets a lower base confidence (0.60) instead of 0.75
+        confidence = 0.60 if unverified else 0.75
         for line in text_response.split('\n'):
             if 'CONFIDENCE' in line.upper():
                 match = re.search(r'(\d+(?:\.\d+)?)', line)
                 if match:
                     confidence = float(match.group(1)) / 100.0
+                    if unverified:
+                        confidence = min(confidence, 0.68)  # cap UNVERIFIED so it stays low-confidence
                     confidence = min(max(confidence, 0.50), 0.99)
                 break
 
@@ -137,44 +141,59 @@ class AIFactChecker:
 
             # ── Prompt ────────────────────────────────────────────────────────
             if evidence_block:
-                prompt = f"""You are an expert fact-checker with access to real-time news.
+                prompt = f"""You are an expert fact-checker. Assess whether the following claim is TRUE, FALSE, or UNVERIFIED.
 
 CLAIM TO VERIFY: "{text}"
 
-I searched the web and found these real news articles published recently:
+REAL NEWS ARTICLES RETRIEVED FROM THE WEB:
 {evidence_block}
 
-INSTRUCTIONS:
-1. Compare the claim against the articles above.
-2. If multiple credible sources report this (or something very similar) → it is REAL.
-3. If the claim contradicts, distorts, or exaggerates what the articles say → it is FAKE.
-4. If no retrieved article is directly relevant, rely on your general knowledge.
-5. Recent events (2024–2026) may be beyond your training data — in that case trust the retrieved articles entirely.
-6. Never mark something FAKE just because it is surprising. Real events can be surprising.
+CLASSIFICATION RULES — read carefully before deciding:
 
-YOU MUST RESPOND IN EXACTLY THIS FORMAT — no preamble, no explanation outside the format:
+• REAL — Use this when:
+  - The retrieved articles confirm the core factual event happened.
+  - The claim is consistent with the articles, even if the headline uses dramatic or opinionated language.
+  - Sensationalist phrasing of a real event is NOT fake news.
+
+• FAKE — Use this ONLY when:
+  - The retrieved articles DIRECTLY CONTRADICT the specific factual assertion (e.g. the event did not happen, the wrong person is named, the statistic is fabricated).
+  - There is clear, direct evidence of misinformation — not just missing confirmation.
+  - Do NOT choose FAKE simply because the claim is surprising, alarming, or uses strong language.
+
+• UNVERIFIED — Use this when:
+  - The retrieved articles cover a related topic but do NOT specifically confirm or deny the claim.
+  - The claim is about a very recent event (2025–2026) that may not be fully reported yet.
+  - You cannot determine truth or falsehood from the available evidence.
+  - When in doubt between FAKE and UNVERIFIED, always choose UNVERIFIED.
+
+IMPORTANT: The retrieved articles may only cover part of the story. Absence of full confirmation is NOT evidence of fakeness.
+
+YOU MUST RESPOND IN EXACTLY THIS FORMAT — no preamble, no extra lines:
 CLASSIFICATION: REAL
 CONFIDENCE: 85%
-REASONING: The claim matches reporting from BBC and Reuters which both confirmed this event.
+REASONING: Brief explanation referencing the articles.
 
-(Replace the example values with your actual assessment.)"""
+Valid classifications: REAL, FAKE, UNVERIFIED"""
             else:
                 prompt = f"""You are an expert fact-checker.
 
 CLAIM TO VERIFY: "{text}"
 
-No live news articles were found for this claim. Use your general knowledge.
+No live news articles were retrieved for this claim.
 
 INSTRUCTIONS:
-- Default to REAL unless there is clear evidence of misinformation (impossible statistics,
-  known hoaxes, logical impossibilities, or patterns of manipulative framing).
-- Be especially cautious about marking recent events (2024–2026) as fake since they may
-  simply be outside your training cutoff.
+- For events in 2024–2026, default to UNVERIFIED — they may simply be outside your training data.
+- Choose FAKE ONLY for claims with clearly impossible statistics, demonstrably established hoaxes,
+  direct logical impossibilities, or classic misinformation patterns you know with high certainty.
+- Choose REAL only if you have strong, specific knowledge confirming this exact claim.
+- When uncertain: UNVERIFIED is always safer than FAKE.
 
 YOU MUST RESPOND IN EXACTLY THIS FORMAT — no preamble:
-CLASSIFICATION: REAL
-CONFIDENCE: 70%
-REASONING: Brief explanation here."""
+CLASSIFICATION: UNVERIFIED
+CONFIDENCE: 60%
+REASONING: Brief explanation here.
+
+Valid classifications: REAL, FAKE, UNVERIFIED"""
 
             # ── Call Gemini — try each model, fall to next on quota error ────
             last_error = None
