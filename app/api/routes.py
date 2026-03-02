@@ -19,12 +19,12 @@ async def predict(
 ):
     """
     Predict whether a news article is fake or real.
-    Flow: BERT Model (primary) → Gemini AI (verification) → News Sources (override)
+    Flow: NewsAPI (real-world evidence) → Gemini AI (primary) → BERT (fallback only)
     Requires authentication.
-    
+
     Args:
         request: PredictionRequest containing the news title and optional text
-        
+
     Returns:
         PredictionResponse with prediction label, confidence, and probabilities
     """
@@ -32,51 +32,63 @@ async def predict(
         user_id = str(current_user["_id"])
         logger.info("[predict] user=%s | title='%.80s'", user_id, request.title)
 
-        # Format input: combine title and text with [SEP] like training data
-        if request.text:
-            formatted_input = f"{request.title} [SEP] {request.text}"
-        else:
-            # Only title provided - duplicate for model compatibility
-            formatted_input = f"{request.title} [SEP] {request.title}"
-        
-        # STEP 1: BERT Model prediction (PRIMARY)
-        model, tokenizer, checkpoint = get_model()
-        bert_result = predict_fake_news(formatted_input, model, tokenizer, checkpoint)
-        bert_result["text"] = request.title
-        
-        final_result = {
-            **bert_result,
-            "is_fake": bert_result["prediction"] == "fake",
-            "prediction_source": "bert_model"
-        }
-        
-        # STEP 2: Gemini AI verification (can adjust prediction)
-        ai_result = ai_checker.predict(request.title)
-        
-        if ai_result:
-            # If BERT and Gemini disagree, use the one with higher confidence
-            bert_confidence = bert_result["confidence"]
-            ai_confidence = ai_result["confidence"]
-            
-            if bert_result["prediction"] != ai_result["prediction"]:
-                # Disagreement - use higher confidence prediction
-                if ai_confidence > bert_confidence:
-                    final_result["prediction"] = ai_result["prediction"]
-                    final_result["confidence"] = ai_confidence
-                    final_result["probabilities"] = ai_result["probabilities"]
-                    final_result["is_fake"] = ai_result["is_fake"]
-                    final_result["prediction_source"] = "gemini_ai"
-                    final_result["ai_override"] = True
-                # else keep BERT prediction
-            else:
-                # Agreement - boost confidence
-                final_result["confidence"] = min(0.98, (bert_confidence + ai_confidence) / 2 + 0.1)
-                final_result["prediction_source"] = "bert_model+gemini_ai"
-        
-        # STEP 3: News validation (can OVERRIDE based on evidence)
+        # ── STEP 1: NewsAPI / Google News search (real-world evidence) ────────
         news_validation = news_validator.validate_claim(request.title)
-        
-        # Add news validation insights - this can override both BERT and Gemini
+        logger.info(
+            "[predict] news_validation status=%s relevant=%d",
+            news_validation.get("verification_status", "n/a") if news_validation else "n/a",
+            news_validation.get("relevant_articles", 0) if news_validation else 0,
+        )
+
+        # ── STEP 2: Gemini AI — PRIMARY predictor ─────────────────────────────
+        ai_result = ai_checker.predict(request.title)
+
+        if ai_result:
+            # Gemini succeeded → use it as the primary result
+            final_result = {
+                "text": request.title,
+                "prediction": ai_result["prediction"],
+                "confidence": ai_result["confidence"],
+                "probabilities": ai_result["probabilities"],
+                "is_fake": ai_result["is_fake"],
+                "prediction_source": "gemini_ai",
+                "classification_type": "binary",
+            }
+            logger.info(
+                "[predict] Gemini primary answer=%s conf=%.2f",
+                ai_result["prediction"].upper(),
+                ai_result["confidence"],
+            )
+
+            # If news found strong corroborating evidence, slightly boost confidence
+            if news_validation and news_validation.get("relevant_articles", 0) >= 2:
+                final_result["confidence"] = min(0.98, final_result["confidence"] + 0.05)
+
+        else:
+            # ── STEP 3: BERT — FALLBACK (only when Gemini is unavailable) ────
+            logger.info("[predict] Gemini unavailable — falling back to BERT")
+
+            if request.text:
+                formatted_input = f"{request.title} [SEP] {request.text}"
+            else:
+                formatted_input = f"{request.title} [SEP] {request.title}"
+
+            model, tokenizer, checkpoint = get_model()
+            bert_result = predict_fake_news(formatted_input, model, tokenizer, checkpoint)
+            bert_result["text"] = request.title
+
+            final_result = {
+                **bert_result,
+                "is_fake": bert_result["prediction"] == "fake",
+                "prediction_source": "bert_model_fallback",
+            }
+            logger.info(
+                "[predict] BERT fallback answer=%s conf=%.2f",
+                bert_result["prediction"].upper(),
+                bert_result["confidence"],
+            )
+
+        # ── Apply news validation insights to final result ────────────────────
         final_result = news_validator.enhance_prediction(final_result, ai_result, news_validation)
         
         # Save prediction to history
@@ -110,7 +122,7 @@ async def batch_predict(
 ):
     """
     Predict multiple news articles at once.
-    Flow: BERT Model (primary) → Gemini AI (verification) → News Sources (override)
+    Flow: NewsAPI (real-world evidence) → Gemini AI (primary) → BERT (fallback only)
     Requires authentication.
     
     Args:
@@ -127,30 +139,36 @@ async def batch_predict(
         predictions_collection = get_predictions_collection()
         
         for text in texts:
-            # Format input for BERT
-            formatted_input = f"{text} [SEP] {text}"
-            
-            # STEP 1: BERT Model prediction (PRIMARY)
-            bert_result = predict_fake_news(formatted_input, model, tokenizer, checkpoint)
-            bert_result["text"] = text
-            final_result = {
-                **bert_result,
-                "is_fake": bert_result["prediction"] == "fake",
-                "prediction_source": "bert_model"
-            }
-            
-            # STEP 2: Gemini AI verification
-            ai_result = ai_checker.predict(text)
-            if ai_result:
-                if bert_result["prediction"] != ai_result["prediction"]:
-                    if ai_result["confidence"] > bert_result["confidence"]:
-                        final_result["prediction"] = ai_result["prediction"]
-                        final_result["confidence"] = ai_result["confidence"]
-                        final_result["is_fake"] = ai_result["is_fake"]
-                        final_result["prediction_source"] = "gemini_ai"
-            
-            # STEP 3: Validate against news sources
+            # ── STEP 1: NewsAPI / Google News ─────────────────────────────────
             news_validation = news_validator.validate_claim(text)
+
+            # ── STEP 2: Gemini AI — PRIMARY ────────────────────────────────────
+            ai_result = ai_checker.predict(text)
+
+            if ai_result:
+                final_result = {
+                    "text": text,
+                    "prediction": ai_result["prediction"],
+                    "confidence": ai_result["confidence"],
+                    "probabilities": ai_result["probabilities"],
+                    "is_fake": ai_result["is_fake"],
+                    "prediction_source": "gemini_ai",
+                    "classification_type": "binary",
+                }
+                if news_validation and news_validation.get("relevant_articles", 0) >= 2:
+                    final_result["confidence"] = min(0.98, final_result["confidence"] + 0.05)
+            else:
+                # ── STEP 3: BERT — FALLBACK ────────────────────────────────────
+                formatted_input = f"{text} [SEP] {text}"
+                bert_result = predict_fake_news(formatted_input, model, tokenizer, checkpoint)
+                bert_result["text"] = text
+                final_result = {
+                    **bert_result,
+                    "is_fake": bert_result["prediction"] == "fake",
+                    "prediction_source": "bert_model_fallback",
+                }
+
+            # ── Apply news validation insights ─────────────────────────────────
             final_result = news_validator.enhance_prediction(final_result, ai_result, news_validation)
             results.append(final_result)
             
