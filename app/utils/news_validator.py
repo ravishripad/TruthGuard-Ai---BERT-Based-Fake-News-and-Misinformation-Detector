@@ -204,7 +204,38 @@ class NewsValidator:
         except Exception as e:
             print(f"SerpAPI error: {e}")
             return None
-    
+
+    def fetch_article_snippet(self, url: str, max_chars: int = 600) -> str:
+        """
+        Fetch the opening paragraphs of an article URL so Gemini gets
+        real content, not just the headline.
+        Returns an empty string on any error (non-blocking).
+        """
+        if not url or not url.startswith("http"):
+            return ""
+        try:
+            from bs4 import BeautifulSoup
+            headers = {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/122.0 Safari/537.36"
+                )
+            }
+            resp = requests.get(url, headers=headers, timeout=6, allow_redirects=True)
+            if resp.status_code != 200:
+                return ""
+            soup = BeautifulSoup(resp.text, "html.parser")
+            # Remove noise
+            for tag in soup(["script", "style", "nav", "header", "footer", "aside"]):
+                tag.decompose()
+            # Collect paragraph text
+            paragraphs = [p.get_text(" ", strip=True) for p in soup.find_all("p") if len(p.get_text(strip=True)) > 60]
+            snippet = " ".join(paragraphs[:6])
+            return snippet[:max_chars].strip()
+        except Exception:
+            return ""
+
     def validate_claim(self, text: str) -> Optional[Dict]:
         """
         Validate a claim against real news sources
@@ -301,11 +332,23 @@ class NewsValidator:
         
         # Sort by relevance score and prioritize
         relevant_articles.sort(key=lambda x: x.get('relevance_score', 0), reverse=True)
-        
+
         # Combine: relevant first, then others
         if relevant_articles:
             other_articles = [a for a in articles if a not in relevant_articles]
             articles = relevant_articles[:3] + other_articles[:2]
+
+        # ── Fetch real article body snippets for Gemini context ──────────────
+        # Only fetch for the top 3 to keep response time reasonable
+        print(f"📰 Fetching article snippets for top {min(3, len(articles))} articles...")
+        for art in articles[:3]:
+            url = art.get('url', '')
+            if url:
+                art['fetched_snippet'] = self.fetch_article_snippet(url)
+                if art['fetched_snippet']:
+                    print(f"   ✓ Fetched snippet from {art.get('source','?')} ({len(art['fetched_snippet'])} chars)")
+                else:
+                    print(f"   ✗ Could not fetch snippet from {url[:60]}")
         
         # Calculate confidence based on findings
         if total_articles == 0:

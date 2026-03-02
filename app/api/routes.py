@@ -40,8 +40,10 @@ async def predict(
             news_validation.get("relevant_articles", 0) if news_validation else 0,
         )
 
-        # ── STEP 2: Gemini AI — PRIMARY predictor ─────────────────────────────
-        ai_result = ai_checker.predict(request.title)
+        # ── STEP 2: Gemini AI — PRIMARY predictor (with news context) ─────────
+        # Pass the fetched articles so Gemini reads actual content, not just headlines
+        news_articles = news_validation.get("articles", []) if news_validation else []
+        ai_result = ai_checker.predict_with_context(request.title, news_articles=news_articles)
 
         if ai_result:
             # Gemini succeeded → use it as the primary result
@@ -53,16 +55,14 @@ async def predict(
                 "is_fake": ai_result["is_fake"],
                 "prediction_source": "gemini_ai",
                 "classification_type": "binary",
+                "context_articles_used": ai_result.get("context_articles_used", 0),
             }
             logger.info(
-                "[predict] Gemini primary answer=%s conf=%.2f",
+                "[predict] Gemini primary answer=%s conf=%.2f context_articles=%d",
                 ai_result["prediction"].upper(),
                 ai_result["confidence"],
+                ai_result.get("context_articles_used", 0),
             )
-
-            # If news found strong corroborating evidence, slightly boost confidence
-            if news_validation and news_validation.get("relevant_articles", 0) >= 2:
-                final_result["confidence"] = min(0.98, final_result["confidence"] + 0.05)
 
         else:
             # ── STEP 3: BERT — FALLBACK (only when Gemini is unavailable) ────
@@ -142,8 +142,9 @@ async def batch_predict(
             # ── STEP 1: NewsAPI / Google News ─────────────────────────────────
             news_validation = news_validator.validate_claim(text)
 
-            # ── STEP 2: Gemini AI — PRIMARY ────────────────────────────────────
-            ai_result = ai_checker.predict(text)
+            # ── STEP 2: Gemini AI — PRIMARY (with news context) ───────────────
+            news_articles = news_validation.get("articles", []) if news_validation else []
+            ai_result = ai_checker.predict_with_context(text, news_articles=news_articles)
 
             if ai_result:
                 final_result = {
