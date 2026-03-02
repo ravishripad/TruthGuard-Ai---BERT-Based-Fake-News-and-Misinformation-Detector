@@ -26,7 +26,7 @@ RUN pip install --upgrade pip \
         requests \
         pydantic \
         "python-multipart" \
-        "google-generativeai" \
+        "google-genai" \
         python-dotenv \
         newsapi-python \
         beautifulsoup4 \
