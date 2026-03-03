@@ -16,8 +16,8 @@ router = APIRouter()
 @router.post("/predict", response_model=PredictionResponse)
 @limiter.limit("30/minute")
 async def predict(
-    http_request: Request,
-    request: PredictionRequest,
+    request: Request,
+    body: PredictionRequest,
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -33,10 +33,10 @@ async def predict(
     """
     try:
         user_id = str(current_user["_id"])
-        logger.info("[predict] user=%s | title='%.80s'", user_id, request.title)
+        logger.info("[predict] user=%s | title='%.80s'", user_id, body.title)
 
         # ── STEP 1: NewsAPI / Google News search (real-world evidence) ────────
-        news_validation = news_validator.validate_claim(request.title)
+        news_validation = news_validator.validate_claim(body.title)
         logger.info(
             "[predict] news_validation status=%s relevant=%d",
             news_validation.get("verification_status", "n/a") if news_validation else "n/a",
@@ -46,12 +46,12 @@ async def predict(
         # ── STEP 2: Gemini AI — PRIMARY predictor (with news context) ─────────
         # Pass the fetched articles so Gemini reads actual content, not just headlines
         news_articles = news_validation.get("articles", []) if news_validation else []
-        ai_result = ai_checker.predict_with_context(request.title, news_articles=news_articles)
+        ai_result = ai_checker.predict_with_context(body.title, news_articles=news_articles)
 
         if ai_result:
             # Gemini succeeded → use it as the primary result
             final_result = {
-                "text": request.title,
+                "text": body.title,
                 "prediction": ai_result["prediction"],
                 "confidence": ai_result["confidence"],
                 "probabilities": ai_result["probabilities"],
@@ -71,14 +71,14 @@ async def predict(
             # ── STEP 3: BERT — FALLBACK (only when Gemini is unavailable) ────
             logger.info("[predict] Gemini unavailable — falling back to BERT")
 
-            if request.text:
-                formatted_input = f"{request.title} [SEP] {request.text}"
+            if body.text:
+                formatted_input = f"{body.title} [SEP] {body.text}"
             else:
-                formatted_input = f"{request.title} [SEP] {request.title}"
+                formatted_input = f"{body.title} [SEP] {body.title}"
 
             model, tokenizer, checkpoint = get_model()
             bert_result = predict_fake_news(formatted_input, model, tokenizer, checkpoint)
-            bert_result["text"] = request.title
+            bert_result["text"] = body.title
 
             final_result = {
                 **bert_result,
@@ -98,7 +98,7 @@ async def predict(
         predictions_collection = get_predictions_collection()
         prediction_record = {
             "user_id": str(current_user["_id"]),
-            "text": request.title[:500],  # Store title
+            "text": body.title[:500],  # Store title
             "prediction": final_result["prediction"],
             "confidence": final_result["confidence"],
             "is_fake": final_result["is_fake"],
@@ -201,8 +201,8 @@ async def batch_predict(
 @router.post("/image-predict")
 @limiter.limit("10/minute")
 async def image_predict(
-    http_request: Request,
-    request: ImagePredictionRequest,
+    request: Request,
+    body: ImagePredictionRequest,
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -217,12 +217,12 @@ async def image_predict(
     """
     try:
         user_id = str(current_user["_id"])
-        logger.info("[image-predict] user=%s | mime=%s", user_id, request.mime_type)
+        logger.info("[image-predict] user=%s | mime=%s", user_id, body.mime_type)
         # Step 1: Extract text from image using OCR
         if not image_ocr.enabled:
             raise HTTPException(status_code=503, detail="Image OCR service not available. Check AI API key.")
         
-        extraction_result = image_ocr.extract_from_base64(request.image, request.mime_type)
+        extraction_result = image_ocr.extract_from_base64(body.image, body.mime_type)
         
         if not extraction_result or not extraction_result.get("extraction_success"):
             raise HTTPException(
@@ -329,8 +329,8 @@ async def image_predict(
 @router.post("/extract-image-text", response_model=ImageExtractionResponse)
 @limiter.limit("10/minute")
 async def extract_image_text(
-    http_request: Request,
-    request: ImagePredictionRequest,
+    request: Request,
+    body: ImagePredictionRequest,
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -347,7 +347,7 @@ async def extract_image_text(
         if not image_ocr.enabled:
             raise HTTPException(status_code=503, detail="Image OCR service not available.")
         
-        result = image_ocr.extract_from_base64(request.image, request.mime_type)
+        result = image_ocr.extract_from_base64(body.image, body.mime_type)
         
         if not result:
             raise HTTPException(status_code=400, detail="Failed to process image.")
