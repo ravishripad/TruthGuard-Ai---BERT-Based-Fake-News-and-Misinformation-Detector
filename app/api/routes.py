@@ -121,7 +121,7 @@ async def predict(
 @router.post("/batch-predict")
 @limiter.limit("5/minute")
 async def batch_predict(
-    http_request: Request,
+    request: Request,
     texts: list[str],
     current_user: dict = Depends(get_current_user)
 ):
