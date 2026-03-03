@@ -240,44 +240,54 @@ async def image_predict(
             else:
                 raise HTTPException(status_code=400, detail="No readable text found in image.")
         
-        # Step 2: Format input for BERT model
-        if text and text != "NOT_FOUND":
-            formatted_input = f"{title} [SEP] {text}"
-        else:
-            formatted_input = f"{title} [SEP] {title}"
-        
-        # Step 3: BERT Model prediction (PRIMARY)
-        model, tokenizer, checkpoint = get_model()
-        bert_result = predict_fake_news(formatted_input, model, tokenizer, checkpoint)
-        bert_result["text"] = title
-        
-        final_result = {
-            **bert_result,
-            "is_fake": bert_result["prediction"] == "fake",
-            "prediction_source": "bert_model",
-            "extracted_from_image": True
-        }
-        
-        # Step 4: Gemini AI verification
-        ai_result = ai_checker.predict(title)
-        
-        if ai_result:
-            bert_confidence = bert_result["confidence"]
-            ai_confidence = ai_result["confidence"]
-            
-            if bert_result["prediction"] != ai_result["prediction"]:
-                if ai_confidence > bert_confidence:
-                    final_result["prediction"] = ai_result["prediction"]
-                    final_result["confidence"] = ai_confidence
-                    final_result["probabilities"] = ai_result["probabilities"]
-                    final_result["is_fake"] = ai_result["is_fake"]
-                    final_result["prediction_source"] = "gemini_ai"
-            else:
-                final_result["confidence"] = min(0.98, (bert_confidence + ai_confidence) / 2 + 0.1)
-                final_result["prediction_source"] = "bert_model+gemini_ai"
-        
-        # Step 5: News validation
+        # Step 2: News search (same as text pipeline — Gemini needs this context)
         news_validation = news_validator.validate_claim(title)
+        logger.info(
+            "[image-predict] news_validation status=%s relevant=%d",
+            news_validation.get("verification_status", "n/a") if news_validation else "n/a",
+            news_validation.get("relevant_articles", 0) if news_validation else 0,
+        )
+        news_articles = news_validation.get("articles", []) if news_validation else []
+
+        # Step 3: Gemini AI — PRIMARY (with news context, identical to text pipeline)
+        ai_result = ai_checker.predict_with_context(title, news_articles=news_articles)
+
+        if ai_result:
+            final_result = {
+                "text": title,
+                "prediction": ai_result["prediction"],
+                "confidence": ai_result["confidence"],
+                "probabilities": ai_result["probabilities"],
+                "is_fake": ai_result["is_fake"],
+                "prediction_source": "gemini_ai",
+                "classification_type": "binary",
+                "extracted_from_image": True,
+                "context_articles_used": ai_result.get("context_articles_used", 0),
+            }
+            logger.info(
+                "[image-predict] Gemini answer=%s conf=%.2f context_articles=%d",
+                ai_result["prediction"].upper(),
+                ai_result["confidence"],
+                ai_result.get("context_articles_used", 0),
+            )
+        else:
+            # Step 4: BERT — FALLBACK (only when Gemini is unavailable)
+            logger.info("[image-predict] Gemini unavailable — falling back to BERT")
+            if text and text != "NOT_FOUND":
+                formatted_input = f"{title} [SEP] {text}"
+            else:
+                formatted_input = f"{title} [SEP] {title}"
+            model, tokenizer, checkpoint = get_model()
+            bert_result = predict_fake_news(formatted_input, model, tokenizer, checkpoint)
+            bert_result["text"] = title
+            final_result = {
+                **bert_result,
+                "is_fake": bert_result["prediction"] == "fake",
+                "prediction_source": "bert_model_fallback",
+                "extracted_from_image": True,
+            }
+
+        # Step 5: Apply news validation insights
         final_result = news_validator.enhance_prediction(final_result, ai_result, news_validation)
         
         # Add extraction metadata
