@@ -363,7 +363,7 @@ class NewsValidator:
         # Combine: relevant first, then others
         if relevant_articles:
             other_articles = [a for a in articles if a not in relevant_articles]
-            articles = relevant_articles[:3] + other_articles[:2]
+            articles = relevant_articles + other_articles
 
         # ── Fetch real article body snippets for Gemini context ──────────────
         # Only fetch for the top 3 to keep response time reasonable
@@ -402,7 +402,7 @@ class NewsValidator:
             'message': message,
             'total_results': total_articles,
             'relevant_articles': relevant_count,
-            'articles': articles[:5],
+            'articles': articles,
             'search_keywords': keywords[:4],
             'search_query': query[:100]
         }

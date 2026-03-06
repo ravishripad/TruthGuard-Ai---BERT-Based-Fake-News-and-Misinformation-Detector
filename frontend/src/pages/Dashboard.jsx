@@ -732,7 +732,7 @@ const Dashboard = () => {
                             Related Sources
                           </h4>
                           <div className="space-y-2.5">
-                            {result.news_validation.articles.slice(0, 5).map((article, index) => (
+                            {result.news_validation.articles.map((article, index) => (
                               <a
                                 key={index}
                                 href={article.url}
