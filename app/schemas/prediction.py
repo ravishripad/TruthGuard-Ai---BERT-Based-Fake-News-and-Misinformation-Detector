@@ -44,6 +44,9 @@ class PredictionResponse(BaseModel):
     prediction_source: str | None = Field(default=None, description="Source of prediction (bert_model, gemini_ai, or bert_model+gemini_ai)")
     override_reason: str | None = Field(default=None, description="Reason if prediction was overridden by news sources")
     
+    # Reasoning
+    reasoning: str | None = Field(default=None, description="Explanation of why the article was classified as real or fake")
+    
     # News validation fields
     news_validation: dict | None = Field(default=None, description="News source validation results")
     news_insight: str | None = Field(default=None, description="Insight from news validation")

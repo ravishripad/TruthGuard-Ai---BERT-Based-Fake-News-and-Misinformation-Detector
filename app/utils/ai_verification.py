@@ -52,8 +52,8 @@ class AIFactChecker:
         print(f"[Gemini raw response]:\n{text_response}\n---")
 
         # Strict match: look for CLASSIFICATION line
-        # Valid values: REAL, FAKE, UNVERIFIED (UNVERIFIED → treated as REAL with capped confidence)
-        classification = "real"  # default — bias toward real to avoid over-flagging
+        # Valid values: REAL, FAKE, UNVERIFIED
+        classification = "fake"  # default — for claims that can't be confirmed, lean fake
         unverified = False
         for line in text_response.split('\n'):
             if 'CLASSIFICATION' in line.upper():
@@ -61,8 +61,8 @@ class AIFactChecker:
                 if re.search(r'\bFAKE\b', after_colon) and not re.search(r'\bNOT\s+FAKE\b', after_colon):
                     classification = "fake"
                 elif re.search(r'\b(UNVERIFIED|UNCERTAIN|UNCLEAR|MISLEADING)\b', after_colon):
-                    # UNVERIFIED = can't confirm but can't deny → give benefit of the doubt
-                    classification = "real"
+                    # UNVERIFIED = we cannot confirm the claim → treat as fake (safer default)
+                    classification = "fake"
                     unverified = True
                 elif re.search(r'\bREAL\b', after_colon):
                     classification = "real"
@@ -80,6 +80,18 @@ class AIFactChecker:
                     confidence = min(max(confidence, 0.50), 0.99)
                 break
 
+        # Extract the REASONING line for user-facing display
+        reasoning = ""
+        capture = False
+        for line in text_response.split('\n'):
+            if 'REASONING' in line.upper():
+                reasoning = line.split(':', 1)[-1].strip() if ':' in line else ""
+                capture = True
+                continue
+            if capture and line.strip():
+                reasoning += " " + line.strip()
+        reasoning = reasoning.strip() or "No detailed reasoning provided."
+
         return {
             "prediction": classification,
             "confidence": confidence,
@@ -89,6 +101,7 @@ class AIFactChecker:
             },
             "is_fake": classification == "fake",
             "ai_reasoning": text_response,
+            "reasoning": reasoning,
             "ai_enabled": True,
         }
 
@@ -151,22 +164,25 @@ REAL NEWS ARTICLES RETRIEVED FROM THE WEB:
 CLASSIFICATION RULES — read carefully before deciding:
 
 • REAL — Use this when:
-  - The retrieved articles confirm the core factual event happened.
-  - The claim is consistent with the articles, even if the headline uses dramatic or opinionated language.
-  - Sensationalist phrasing of a real event is NOT fake news.
+  - The retrieved articles SPECIFICALLY confirm the core factual event described in the claim (who, what, where) actually happened.
+  - The claim's key facts are directly supported by the articles — not just topically related.
+  - Sensationalist phrasing of a CONFIRMED real event is NOT fake news.
+  - Do NOT choose REAL merely because the articles cover a related topic without confirming the specific claim.
 
-• FAKE — Use this ONLY when:
+• FAKE — Use this when:
   - The retrieved articles DIRECTLY CONTRADICT the specific factual assertion (e.g. the event did not happen, the wrong person is named, the statistic is fabricated).
-  - There is clear, direct evidence of misinformation — not just missing confirmation.
-  - Do NOT choose FAKE simply because the claim is surprising, alarming, or uses strong language.
+  - The claim describes a HIGH-PROFILE EXTRAORDINARY EVENT (e.g. assassination of a sitting world leader, nuclear exchange, military attack on a capital city, declaration of world war) that would generate massive global breaking news coverage, yet NONE of the retrieved articles mention it occurring.
+  - There is clear evidence of fabrication or misinformation.
+  - Do NOT choose FAKE simply because the claim uses strong language or covers a sensitive topic — only when the specific facts are contradicted or clearly absent from worldwide coverage.
 
 • UNVERIFIED — Use this when:
   - The retrieved articles cover a related topic but do NOT specifically confirm or deny the claim.
-  - The claim is about a very recent event (2025–2026) that may not be fully reported yet.
+  - The claim is about an ordinary or minor event in 2025–2026 that may not be fully reported yet.
   - You cannot determine truth or falsehood from the available evidence.
-  - When in doubt between FAKE and UNVERIFIED, always choose UNVERIFIED.
+  - When in doubt between FAKE and UNVERIFIED for ORDINARY claims, choose UNVERIFIED.
+  - EXCEPTION: For extraordinary high-profile claims (world leader death, nuclear attack, etc.), if no article confirms it, choose FAKE — not UNVERIFIED.
 
-IMPORTANT: The retrieved articles may only cover part of the story. Absence of full confirmation is NOT evidence of fakeness.
+IMPORTANT: Finding articles about a RELATED TOPIC (e.g. Iran missile attacks) does NOT confirm a SPECIFIC claim (e.g. US President was killed). Check whether the articles confirm the exact claim, not just the general subject area.
 
 YOU MUST RESPOND IN EXACTLY THIS FORMAT — no preamble, no extra lines:
 CLASSIFICATION: REAL
@@ -182,11 +198,11 @@ CLAIM TO VERIFY: "{text}"
 No live news articles were retrieved for this claim.
 
 INSTRUCTIONS:
-- For events in 2024–2026, default to UNVERIFIED — they may simply be outside your training data.
-- Choose FAKE ONLY for claims with clearly impossible statistics, demonstrably established hoaxes,
-  direct logical impossibilities, or classic misinformation patterns you know with high certainty.
+- For ordinary events in 2024–2026, default to UNVERIFIED — they may simply be outside your training data.
+- EXCEPTION: For extraordinary high-profile claims (e.g. assassination of a sitting world leader, nuclear war, major capital city attacked, declaration of world war between superpowers), the ABSENCE of news coverage is itself strong evidence the event did not happen. Such events would generate instant worldwide breaking news. If you have no knowledge of the event occurring AND no articles confirm it, classify as FAKE.
+- Choose FAKE for claims with clearly impossible statistics, demonstrably established hoaxes, direct logical impossibilities, classic misinformation patterns, or extraordinary world-headline events for which no confirmation exists anywhere.
 - Choose REAL only if you have strong, specific knowledge confirming this exact claim.
-- When uncertain: UNVERIFIED is always safer than FAKE.
+- When uncertain about ordinary claims: UNVERIFIED is safer than FAKE.
 
 YOU MUST RESPOND IN EXACTLY THIS FORMAT — no preamble:
 CLASSIFICATION: UNVERIFIED

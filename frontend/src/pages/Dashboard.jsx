@@ -22,7 +22,8 @@ import {
   Image,
   Upload,
   FileText,
-  X
+  X,
+  Info
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
@@ -641,6 +642,22 @@ const Dashboard = () => {
                       </div>
                     </div>
                   </motion.div>
+
+                  {/* Reasoning */}
+                  {result.reasoning && (
+                    <motion.div
+                      className="p-5 rounded-2xl mb-6 bg-dark-900/50 border border-white/[0.06]"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: duration.base, delay: 0.2 }}
+                    >
+                      <h4 className="font-medium text-white mb-2 flex items-center gap-2 text-sm">
+                        <Info className="w-4 h-4 text-accent" />
+                        Why this classification?
+                      </h4>
+                      <p className="text-sm text-dark-300 leading-relaxed">{result.reasoning}</p>
+                    </motion.div>
+                  )}
 
                   {/* Chart */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

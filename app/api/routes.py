@@ -58,6 +58,7 @@ async def predict(
                 "is_fake": ai_result["is_fake"],
                 "prediction_source": "gemini_ai",
                 "classification_type": "binary",
+                "reasoning": ai_result.get("reasoning", "No reasoning available."),
                 "context_articles_used": ai_result.get("context_articles_used", 0),
             }
             logger.info(
@@ -84,6 +85,7 @@ async def predict(
                 **bert_result,
                 "is_fake": bert_result["prediction"] == "fake",
                 "prediction_source": "bert_model_fallback",
+                "reasoning": f"BERT model classified this as {bert_result['prediction']} with {bert_result['confidence']*100:.1f}% confidence based on linguistic pattern analysis.",
             }
             logger.info(
                 "[predict] BERT fallback answer=%s conf=%.2f",
@@ -162,6 +164,7 @@ async def batch_predict(
                     "is_fake": ai_result["is_fake"],
                     "prediction_source": "gemini_ai",
                     "classification_type": "binary",
+                    "reasoning": ai_result.get("reasoning", "No reasoning available."),
                 }
                 if news_validation and news_validation.get("relevant_articles", 0) >= 2:
                     final_result["confidence"] = min(0.98, final_result["confidence"] + 0.05)
@@ -174,6 +177,7 @@ async def batch_predict(
                     **bert_result,
                     "is_fake": bert_result["prediction"] == "fake",
                     "prediction_source": "bert_model_fallback",
+                    "reasoning": f"BERT model classified this as {bert_result['prediction']} with {bert_result['confidence']*100:.1f}% confidence based on linguistic pattern analysis.",
                 }
 
             # ── Apply news validation insights ─────────────────────────────────
@@ -262,6 +266,7 @@ async def image_predict(
                 "prediction_source": "gemini_ai",
                 "classification_type": "binary",
                 "extracted_from_image": True,
+                "reasoning": ai_result.get("reasoning", "No reasoning available."),
                 "context_articles_used": ai_result.get("context_articles_used", 0),
             }
             logger.info(
@@ -285,6 +290,7 @@ async def image_predict(
                 "is_fake": bert_result["prediction"] == "fake",
                 "prediction_source": "bert_model_fallback",
                 "extracted_from_image": True,
+                "reasoning": f"BERT model classified this as {bert_result['prediction']} with {bert_result['confidence']*100:.1f}% confidence based on linguistic pattern analysis.",
             }
 
         # Step 5: Apply news validation insights
