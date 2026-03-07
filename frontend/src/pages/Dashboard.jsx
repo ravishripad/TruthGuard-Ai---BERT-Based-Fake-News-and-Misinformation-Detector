@@ -23,7 +23,9 @@ import {
   Upload,
   FileText,
   X,
-  Info
+  Info,
+  ChevronDown,
+  Zap
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
@@ -52,10 +54,56 @@ const Dashboard = () => {
   const [extractedText, setExtractedText] = useState(null);
   const fileInputRef = useRef(null);
 
+  // UX: scroll-to-results ref
+  const resultsRef = useRef(null);
+  // UX: title input ref for focus management
+  const titleInputRef = useRef(null);
+  // UX: collapsible sections state (desktop expanded, mobile collapsed)
+  const [expandedSections, setExpandedSections] = useState({
+    reasoning: typeof window !== 'undefined' ? window.innerWidth >= 768 : true,
+    sources: typeof window !== 'undefined' ? window.innerWidth >= 768 : true,
+  });
+  // UX: history-prefill flash feedback
+  const [justPrefilled, setJustPrefilled] = useState(false);
+
   useEffect(() => {
     loadHistory();
     loadStats();
   }, []);
+
+  // UX: auto-dismiss errors after 6s
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(''), 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
+  // UX: scroll to results when they arrive
+  useEffect(() => {
+    if (result && resultsRef.current) {
+      const timer = setTimeout(() => {
+        resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [result]);
+
+  // UX: Ctrl+Enter / Cmd+Enter to analyze
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        if (inputMode === 'text' && title.length >= 5 && !loading) {
+          handleAnalyze();
+        } else if (inputMode === 'image' && selectedImage && !loading) {
+          handleImageAnalyze();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [inputMode, title, loading, selectedImage]);
 
   const loadHistory = async () => {
     setHistoryLoading(true);
@@ -176,12 +224,30 @@ const Dashboard = () => {
     }
   };
 
-  /* Safe prefill from history – fixes the undefined setNewsText bug */
+  /* Safe prefill from history */
   const handleHistoryPrefill = (item) => {
     setTitle(item.text || '');
     setArticleText('');
     setInputMode('text');
+    setResult(null);
+    setError('');
+    setJustPrefilled(true);
+    setTimeout(() => {
+      titleInputRef.current?.focus();
+      titleInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      setJustPrefilled(false);
+    }, 150);
   };
+
+  /* UX: switch input mode and clear stale state */
+  const handleModeSwitch = (mode) => {
+    setInputMode(mode);
+    setResult(null);
+    setError('');
+  };
+
+  /* UX: title validation helper */
+  const isTitleValid = title.length >= 5;
 
   const sampleTexts = [
     { title: "The President announced new climate policies", text: "The new policies will reduce carbon emissions by 50% by 2030, according to official statements." },
@@ -343,6 +409,8 @@ const Dashboard = () => {
             <div className="flex items-center gap-2 sm:gap-3">
               <button
                 onClick={() => setShowHistory(!showHistory)}
+                aria-label="Toggle prediction history"
+                aria-pressed={showHistory}
                 className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-all ${
                   showHistory 
                     ? 'bg-accent/15 text-accent border border-accent/20' 
@@ -362,6 +430,7 @@ const Dashboard = () => {
               
               <button
                 onClick={logout}
+                aria-label="Logout from account"
                 className="flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-danger hover:bg-danger/10 rounded-xl transition-colors"
               >
                 <LogOut className="w-4 h-4" />
@@ -389,9 +458,12 @@ const Dashboard = () => {
               </div>
 
               {/* Input Mode Tabs */}
-              <div className="flex gap-1 mb-6 p-1 bg-dark-900/50 rounded-xl border border-white/[0.06]">
+              <div className="flex gap-1 mb-6 p-1 bg-dark-900/50 rounded-xl border border-white/[0.06]" role="tablist">
                 <button
-                  onClick={() => setInputMode('text')}
+                  onClick={() => handleModeSwitch('text')}
+                  role="tab"
+                  aria-selected={inputMode === 'text'}
+                  aria-label="Switch to text input mode"
                   className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg font-medium text-sm transition-all ${
                     inputMode === 'text'
                       ? 'bg-white/[0.08] text-white shadow-sm border border-accent/20' 
@@ -402,7 +474,10 @@ const Dashboard = () => {
                   Text Input
                 </button>
                 <button
-                  onClick={() => setInputMode('image')}
+                  onClick={() => handleModeSwitch('image')}
+                  role="tab"
+                  aria-selected={inputMode === 'image'}
+                  aria-label="Switch to image upload mode"
                   className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg font-medium text-sm transition-all ${
                     inputMode === 'image'
                       ? 'bg-white/[0.08] text-white shadow-sm border border-accent/20' 
@@ -434,13 +509,27 @@ const Dashboard = () => {
 
                   {/* Title Input */}
                   <div className="mb-4">
-                    <label className="block text-sm font-medium text-dark-300 mb-2">News Title / Headline *</label>
+                    <label className="block text-sm font-medium text-dark-300 mb-2">
+                      News Title / Headline *
+                      {title.length > 0 && (
+                        <span className={`ml-2 text-xs font-normal ${
+                          isTitleValid ? 'text-success' : 'text-dark-500'
+                        }`}>
+          
+                        </span>
+                      )}
+                    </label>
                     <input
+                      ref={titleInputRef}
                       type="text"
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
                       placeholder="Enter the news headline…"
-                      className="input-dark w-full"
+                      aria-required="true"
+                      aria-invalid={title.length > 0 && !isTitleValid}
+                      className={`input-dark w-full transition-all ${
+                        justPrefilled ? 'ring-2 ring-accent/30 border-accent/40' : ''
+                      }`}
                     />
                   </div>
 
@@ -459,24 +548,32 @@ const Dashboard = () => {
                     <span className="text-xs text-dark-500">
                       Title: {title.length} chars &middot; Text: {articleText.length} chars
                     </span>
-                    <motion.button
-                      onClick={handleAnalyze}
-                      disabled={loading || title.length < 5}
-                      className="btn-primary rounded-full !px-6 !py-3 text-sm disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
-                      whileTap={{ scale: 0.97 }}
-                    >
-                      {loading ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Analyzing…
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="w-4 h-4" />
-                          Analyze
-                        </>
-                      )}
-                    </motion.button>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[11px] text-dark-600 hidden sm:inline" aria-hidden="true">
+                        Ctrl+Enter
+                      </span>
+                      <motion.button
+                        onClick={handleAnalyze}
+                        disabled={loading || !isTitleValid}
+                        aria-label="Analyze news article"
+                        className="btn-primary rounded-full !px-6 !py-3 text-sm disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
+                        whileTap={{ scale: 0.97 }}
+                        animate={justPrefilled ? { scale: [1, 1.05, 1] } : {}}
+                        transition={justPrefilled ? { repeat: 2, duration: 0.3 } : {}}
+                      >
+                        {loading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Analyzing…
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-4 h-4" />
+                            Analyze
+                          </>
+                        )}
+                      </motion.button>
+                    </div>
                   </div>
                 </>
               ) : (
@@ -493,6 +590,10 @@ const Dashboard = () => {
                   {!imagePreview ? (
                     <div
                       onClick={() => fileInputRef.current?.click()}
+                      role="button"
+                      tabIndex={0}
+                      aria-label="Upload an image for analysis"
+                      onKeyDown={(e) => e.key === 'Enter' && fileInputRef.current?.click()}
                       className="border-2 border-dashed border-white/[0.08] rounded-2xl p-8 text-center cursor-pointer hover:border-accent/30 hover:bg-accent/5 transition-all duration-300 group"
                     >
                       <Upload className="w-10 h-10 mx-auto text-dark-500 group-hover:text-accent mb-4 transition-colors" />
@@ -514,6 +615,7 @@ const Dashboard = () => {
                       />
                       <button
                         onClick={removeImage}
+                        aria-label="Remove selected image"
                         className="absolute top-2 right-2 p-2 bg-danger/90 hover:bg-danger rounded-lg transition-colors"
                       >
                         <X className="w-4 h-4 text-white" />
@@ -556,18 +658,27 @@ const Dashboard = () => {
                 </div>
               )}
 
-              {/* Error */}
+              {/* Error Toast — fixed position, auto-dismisses */}
               <AnimatePresence>
                 {error && (
                   <motion.div
-                    className="mt-4 p-4 bg-danger/10 border border-danger/30 text-danger rounded-xl flex items-center gap-2 text-sm"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4 }}
-                    transition={{ duration: duration.fast }}
+                    role="alert"
+                    aria-live="assertive"
+                    className="fixed top-20 right-5 z-50 max-w-sm bg-dark-900/95 backdrop-blur-xl border border-danger/40 text-danger rounded-2xl p-4 flex items-start gap-3 shadow-lg shadow-danger/10"
+                    initial={{ opacity: 0, x: 40, scale: 0.95 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    exit={{ opacity: 0, x: 40, scale: 0.95 }}
+                    transition={{ duration: 0.25 }}
                   >
-                    <AlertTriangle className="w-5 h-5 flex-shrink-0" />
-                    {error}
+                    <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                    <span className="flex-1 text-sm">{error}</span>
+                    <button
+                      onClick={() => setError('')}
+                      aria-label="Dismiss error"
+                      className="text-danger/60 hover:text-danger transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -588,10 +699,30 @@ const Dashboard = () => {
                 </motion.div>
               )}
 
+              {/* Empty state — shown before first analysis */}
+              {!result && !loading && (
+                <motion.div
+                  className="glass-card-dim p-8 sm:p-10 text-center"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.3, duration: 0.5 }}
+                >
+                  <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-accent/10 border border-accent/20 mb-4">
+                    <Zap className="w-7 h-7 text-accent" />
+                  </div>
+                  <h3 className="text-base font-semibold text-white mb-2">Ready to Detect</h3>
+                  <p className="text-sm text-dark-400 max-w-md mx-auto leading-relaxed">
+                    Paste a news headline above and click <span className="text-dark-200 font-medium">Analyze</span> to check if it's real or fake. You can also upload a screenshot.
+                  </p>
+                </motion.div>
+              )}
+
               {result && (
                 <motion.div
                   key="result"
-                  className="glass-card-dim p-6 sm:p-7"
+                  ref={resultsRef}
+                  tabIndex={-1}
+                  className="glass-card-dim p-6 sm:p-7 focus:outline-none"
                   initial={{ opacity: 0, y: 24 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: duration.slow, ease: ease.out }}
@@ -643,19 +774,39 @@ const Dashboard = () => {
                     </div>
                   </motion.div>
 
-                  {/* Reasoning */}
+                  {/* Reasoning — collapsible on mobile */}
                   {result.reasoning && (
                     <motion.div
-                      className="p-5 rounded-2xl mb-6 bg-dark-900/50 border border-white/[0.06]"
+                      className="rounded-2xl mb-6 bg-dark-900/50 border border-white/[0.06] overflow-hidden"
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: duration.base, delay: 0.2 }}
                     >
-                      <h4 className="font-medium text-white mb-2 flex items-center gap-2 text-sm">
-                        <Info className="w-4 h-4 text-accent" />
-                        Why this classification?
-                      </h4>
-                      <p className="text-sm text-dark-300 leading-relaxed">{result.reasoning}</p>
+                      <button
+                        onClick={() => setExpandedSections(p => ({ ...p, reasoning: !p.reasoning }))}
+                        aria-expanded={expandedSections.reasoning}
+                        className="w-full flex items-center justify-between p-5 text-left"
+                      >
+                        <h4 className="font-medium text-white flex items-center gap-2 text-sm">
+                          <Info className="w-4 h-4 text-accent" />
+                          Why this classification?
+                        </h4>
+                        <ChevronDown className={`w-4 h-4 text-dark-400 transition-transform duration-200 ${
+                          expandedSections.reasoning ? 'rotate-180' : ''
+                        }`} />
+                      </button>
+                      <AnimatePresence initial={false}>
+                        {expandedSections.reasoning && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                          >
+                            <p className="text-sm text-dark-300 leading-relaxed px-5 pb-5">{result.reasoning}</p>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </motion.div>
                   )}
 
@@ -726,46 +877,71 @@ const Dashboard = () => {
                       </div>
 
                       {result.news_validation.articles && result.news_validation.articles.length > 0 && (
-                        <div className="p-4 bg-dark-900/50 rounded-xl border border-white/[0.06]">
-                          <h4 className="font-medium text-white mb-3 flex items-center gap-2 text-sm">
-                            <ExternalLink className="w-4 h-4 text-accent" />
-                            Related Sources
-                          </h4>
-                          <div className="space-y-2.5">
-                            {result.news_validation.articles.map((article, index) => (
-                              <a
-                                key={index}
-                                href={article.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="block p-3 bg-white/[0.03] hover:bg-white/[0.06] rounded-xl border border-white/[0.06] hover:border-accent/20 transition-all duration-200 group"
+                        <div className="bg-dark-900/50 rounded-xl border border-white/[0.06] overflow-hidden">
+                          <button
+                            onClick={() => setExpandedSections(p => ({ ...p, sources: !p.sources }))}
+                            aria-expanded={expandedSections.sources}
+                            className="w-full flex items-center justify-between p-4 text-left"
+                          >
+                            <h4 className="font-medium text-white flex items-center gap-2 text-sm">
+                              <ExternalLink className="w-4 h-4 text-accent" />
+                              Related Sources
+                              <span className="text-[11px] px-2 py-0.5 bg-accent/10 text-accent rounded-full font-medium">
+                                {result.news_validation.articles.length}
+                              </span>
+                            </h4>
+                            <ChevronDown className={`w-4 h-4 text-dark-400 transition-transform duration-200 ${
+                              expandedSections.sources ? 'rotate-180' : ''
+                            }`} />
+                          </button>
+                          <AnimatePresence initial={false}>
+                            {expandedSections.sources && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.2 }}
+                                className="px-4 pb-4"
                               >
-                                <div className="flex items-start justify-between gap-2">
-                                  <div className="flex-1 min-w-0">
-                                    <h5 className="text-sm font-medium text-dark-200 group-hover:text-accent transition-colors line-clamp-2">
-                                      {article.title}
-                                    </h5>
-                                    <div className="flex items-center gap-2 mt-1.5">
-                                      <span className="text-[11px] px-2 py-0.5 bg-accent/10 text-accent rounded-full font-medium">
-                                        {article.source}
-                                      </span>
-                                      {article.published_at && (
-                                        <span className="text-[11px] text-dark-500">
-                                          {new Date(article.published_at).toLocaleDateString()}
-                                        </span>
-                                      )}
-                                    </div>
-                                    {article.description && (
-                                      <p className="text-xs text-dark-500 mt-2 line-clamp-2">
-                                        {article.description}
-                                      </p>
-                                    )}
-                                  </div>
-                                  <ExternalLink className="w-4 h-4 text-dark-500 group-hover:text-accent flex-shrink-0 mt-0.5" />
+                                <div className="space-y-2.5">
+                                  {result.news_validation.articles.map((article, index) => (
+                                    <a
+                                      key={index}
+                                      href={article.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      aria-label={`Read article: ${article.title} — opens in new tab`}
+                                      className="block p-3 bg-white/[0.03] hover:bg-white/[0.06] rounded-xl border border-white/[0.06] hover:border-accent/20 transition-all duration-200 group"
+                                    >
+                                      <div className="flex items-start justify-between gap-2">
+                                        <div className="flex-1 min-w-0">
+                                          <h5 className="text-sm font-medium text-dark-200 group-hover:text-accent transition-colors line-clamp-2">
+                                            {article.title}
+                                          </h5>
+                                          <div className="flex items-center gap-2 mt-1.5">
+                                            <span className="text-[11px] px-2 py-0.5 bg-accent/10 text-accent rounded-full font-medium">
+                                              {article.source}
+                                            </span>
+                                            {article.published_at && (
+                                              <span className="text-[11px] text-dark-500">
+                                                {new Date(article.published_at).toLocaleDateString()}
+                                              </span>
+                                            )}
+                                          </div>
+                                          {article.description && (
+                                            <p className="text-xs text-dark-500 mt-2 line-clamp-2">
+                                              {article.description}
+                                            </p>
+                                          )}
+                                        </div>
+                                        <ExternalLink className="w-4 h-4 text-dark-500 group-hover:text-accent flex-shrink-0 mt-0.5" aria-hidden="true" />
+                                      </div>
+                                    </a>
+                                  ))}
                                 </div>
-                              </a>
-                            ))}
-                          </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </div>
                       )}
                     </div>
