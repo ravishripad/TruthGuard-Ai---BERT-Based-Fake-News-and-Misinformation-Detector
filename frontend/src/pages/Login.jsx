@@ -42,39 +42,39 @@ const Login = () => {
       <ThreeBackground />
 
       <motion.div
-        className="relative pro-card w-full max-w-md p-10 sm:p-12 z-10"
+        className="relative pro-card w-full max-w-[380px] p-6 sm:p-8 z-10"
         initial={{ opacity: 0, y: 30, filter: 'blur(10px)' }}
         animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
         transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
       >
         {/* Back Link */}
-        <Link to="/" className="inline-flex items-center gap-2 text-pro-sub hover:text-pro-blue transition-colors mb-10 text-[11px] font-bold uppercase tracking-widest">
-          <ArrowLeft className="w-4 h-4" />
-          Back to Portal
+        <Link to="/" className="inline-flex items-center gap-2 text-pro-sub hover:text-pro-text transition-colors mb-6 text-[10px] font-black uppercase tracking-widest">
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Portal
         </Link>
 
         {/* Brand */}
-        <div className="text-center mb-12">
+        <div className="text-center mb-8">
           <motion.div
-            className={`inline-flex items-center justify-center w-20 h-20 rounded-3xl mb-6 border shadow-sm ${isDark ? 'bg-pro-bg border-pro-border' : 'bg-indigo-50 border-indigo-100'}`}
+            className={`inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4 border shadow-sm ${isDark ? 'bg-pro-bg border-pro-border' : 'bg-indigo-50 border-indigo-100'}`}
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.2 }}
           >
-            <Shield className="w-10 h-10 text-pro-blue" />
+            <Shield className="w-7 h-7 text-pro-blue" />
           </motion.div>
-          <h1 className="text-3xl font-black text-pro-text tracking-tight uppercase italic">Welcome</h1>
-          <p className="text-pro-sub mt-2 text-[11px] font-bold uppercase tracking-[0.2em]">Neural Node Authentication</p>
+          <h1 className="text-2xl font-black text-pro-text tracking-tight uppercase italic">Welcome</h1>
+          <p className="text-pro-sub mt-1 text-[9px] font-black uppercase tracking-[0.2em]">Authentication Required</p>
         </div>
 
         {/* Error */}
         {error && (
           <motion.div
-            className="bg-red-500/10 border border-red-500/20 text-red-500 p-4 rounded-2xl mb-8 flex items-center gap-3 text-xs font-bold"
+            className="bg-red-500/10 border border-red-500/20 text-red-500 p-3 rounded-xl mb-6 flex items-center gap-3 text-[10px] font-bold"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
           >
-            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
             <span>{error}</span>
           </motion.div>
         )}
@@ -82,7 +82,7 @@ const Login = () => {
         {/* Form */}
         <motion.form 
           onSubmit={handleSubmit} 
-          className="space-y-6"
+          className="space-y-4"
           initial="hidden"
           animate="visible"
           variants={{
@@ -90,37 +90,37 @@ const Login = () => {
             visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.3 } }
           }}
         >
-          <motion.div className="space-y-2" variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } } }}>
-            <label className="block text-[10px] font-black text-pro-sub uppercase tracking-[0.2em] ml-1">
+          <motion.div className="space-y-1.5" variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } } }}>
+            <label className="block text-[9px] font-black text-pro-sub uppercase tracking-[0.2em] ml-1">
               Identity
             </label>
             <div className="relative group">
-              <Mail className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-pro-sub group-focus-within:text-pro-blue transition-colors" />
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-pro-sub group-focus-within:text-pro-blue transition-colors" />
               <input
                 type="email"
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
                 required
-                className="input-pro !pl-14"
+                className="input-pro !pl-12 !py-2.5 text-sm"
                 placeholder="operative@truthlens.ai"
               />
             </div>
           </motion.div>
 
-          <motion.div className="space-y-2" variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } } }}>
-            <label className="block text-[10px] font-black text-pro-sub uppercase tracking-[0.2em] ml-1">
+          <motion.div className="space-y-1.5" variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } } }}>
+            <label className="block text-[9px] font-black text-pro-sub uppercase tracking-[0.2em] ml-1">
               Cipher
             </label>
             <div className="relative group">
-              <Lock className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-pro-sub group-focus-within:text-pro-blue transition-colors" />
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-pro-sub group-focus-within:text-pro-blue transition-colors" />
               <input
                 type="password"
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
                 required
-                className="input-pro !pl-14"
+                className="input-pro !pl-12 !py-2.5 text-sm"
                 placeholder="••••••••"
               />
             </div>
@@ -130,10 +130,10 @@ const Login = () => {
             <motion.button
               type="submit"
               disabled={loading}
-              className="btn-pro w-full !py-5 !rounded-2xl !text-[11px] uppercase tracking-[0.2em] mt-6"
+              className="btn-pro w-full !py-3.5 !rounded-xl !text-[10px] uppercase font-black tracking-[0.2em] mt-4"
             >
               {loading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 'Initialize Session'
               )}
@@ -142,7 +142,7 @@ const Login = () => {
         </motion.form>
 
         {/* Footer Link */}
-        <p className="text-center text-pro-sub text-[11px] font-bold uppercase tracking-widest mt-12">
+        <p className="text-center text-pro-sub text-[10px] font-black uppercase tracking-widest mt-8">
           New Operative?{' '}
           <Link to="/register" className="text-pro-blue hover:underline ml-1">
             Request Access

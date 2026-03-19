@@ -3,21 +3,16 @@ import { useAuth } from '../context/AuthContext';
 import { predictionAPI, authAPI } from '../api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Search, 
   AlertTriangle, 
   Loader2, 
   CheckCircle,
-  Sparkles,
-  Image as ImageIcon,
   Upload,
   X,
   Cpu,
-  Zap,
   History as HistoryIcon,
   Shield,
   ChevronRight,
   Menu,
-  Layout,
   FileText,
   Scan,
   Terminal
@@ -56,7 +51,6 @@ const Dashboard = () => {
     loadStats();
     loadHistory();
     
-    // Collapsed sidebar by default on tablet-sized screens
     if (window.innerWidth < 1280) {
       setIsSidebarCollapsed(true);
     }
@@ -65,7 +59,6 @@ const Dashboard = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Handle window resize for sidebar
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth < 1024) {
@@ -187,6 +180,8 @@ const Dashboard = () => {
         toggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         isMobileOpen={isMobileSidebarOpen}
         closeMobile={() => setIsSidebarOpen(false)}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
       />
 
       <AnimatePresence>
@@ -201,76 +196,64 @@ const Dashboard = () => {
         )}
       </AnimatePresence>
 
-      <main className={`flex-1 h-screen lg:h-[100dvh] overflow-y-auto transition-all duration-500 ease-in-out relative z-10 
-        ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'} 
-        p-4 md:p-8 xl:p-12 w-full custom-scrollbar`}
+      <motion.main 
+        initial={false}
+        animate={{ 
+          paddingLeft: isSidebarCollapsed ? (window.innerWidth < 1024 ? 0 : 80) : (window.innerWidth < 1024 ? 0 : 260)
+        }}
+        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+        className="flex-1 h-screen lg:h-[100dvh] overflow-y-auto relative z-10 p-4 md:p-8 xl:p-12 w-full custom-scrollbar"
       >
         <div className="max-w-6xl mx-auto space-y-8 lg:space-y-12 pb-24">
           
-          {/* Header & Welcome */}
-          <header className="space-y-6 pt-2 lg:pt-0">
-            <div className="flex items-center justify-between">
-              <button onClick={() => setIsSidebarOpen(true)} className="lg:hidden p-3 bg-pro-surface border border-pro-border rounded-2xl active:scale-95 transition-transform">
-                <Menu className="w-6 h-6 text-pro-blue" />
-              </button>
-              <div className="flex-1 lg:flex-none text-right lg:text-left">
-                <h1 className="text-2xl sm:text-4xl xl:text-5xl font-black tracking-tightest text-pro-text italic">Intelligence</h1>
-                <p className="text-pro-sub text-[10px] sm:text-xs font-bold uppercase tracking-widest mt-1 sm:mt-2">Neural Workspace</p>
-              </div>
-              <div className="hidden md:flex bg-pro-surface p-1 rounded-2xl border border-pro-border">
-                <button onClick={() => setActiveTab('analysis')} className={`px-6 xl:px-8 py-2.5 xl:py-3 rounded-xl transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2 ${activeTab === 'analysis' ? 'bg-pro-text text-pro-bg shadow-lg shadow-pro-text/5' : 'text-pro-sub hover:text-pro-text'}`}>
-                  <Scan className="w-4 h-4" /> Scan
-                </button>
-                <button onClick={() => setActiveTab('history')} className={`px-6 xl:px-8 py-2.5 xl:py-3 rounded-xl transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2 ${activeTab === 'history' ? 'bg-pro-text text-pro-bg shadow-lg shadow-pro-text/5' : 'text-pro-sub hover:text-pro-text'}`}>
-                  <HistoryIcon className="w-4 h-4" /> Archive
-                </button>
-              </div>
+          {/* Header & Mobile Menu Trigger */}
+          <header className="flex items-center justify-between pt-2 lg:pt-0">
+            <button onClick={() => setIsSidebarOpen(true)} className="lg:hidden p-3 bg-pro-surface border border-pro-border rounded-2xl active:scale-95 transition-transform">
+              <Menu className="w-6 h-6 text-pro-blue" />
+            </button>
+            <div className="flex-1 lg:flex-none text-right lg:text-left">
+              <h1 className="text-2xl sm:text-4xl xl:text-5xl font-black tracking-tightest text-pro-text italic">
+                {activeTab === 'analysis' ? 'Intelligence' : 'Archive'}
+              </h1>
+              <p className="text-pro-sub text-[10px] sm:text-xs font-bold uppercase tracking-widest mt-1 sm:mt-2">
+                {activeTab === 'analysis' ? 'Neural Workspace' : 'Tactical Records'}
+              </p>
             </div>
-
-            <AnimatePresence>
-              {showWelcome && (
-                <motion.div 
-                  initial={{ opacity: 0, y: -20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  className="bg-pro-blue/10 border border-pro-blue/20 p-4 sm:p-6 rounded-3xl flex items-center gap-4 sm:gap-5 relative overflow-hidden backdrop-blur-md"
-                >
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-pro-blue/20 flex items-center justify-center shrink-0">
-                    <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-pro-blue" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="text-sm sm:text-lg font-black text-pro-text uppercase italic truncate">Access Authorized</h3>
-                    <p className="text-pro-sub text-xs sm:text-sm font-medium truncate sm:whitespace-normal">Operative <span className="text-pro-blue font-bold">{user?.username}</span> verified.</p>
-                  </div>
-                  <button onClick={() => setShowWelcome(false)} className="p-2 hover:bg-white/5 rounded-xl transition-colors">
-                    <X className="w-5 h-5 text-pro-sub" />
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            
+            {/* Context Badge */}
+            <div className="hidden md:flex items-center gap-3 px-4 py-2 bg-pro-surface border border-pro-border rounded-2xl">
+               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+               <span className="text-[10px] font-black text-pro-text uppercase tracking-widest">Neural Link Active</span>
+            </div>
           </header>
 
-          {/* Mobile Tab Switcher - Tablets and Phones */}
-          <div className="md:hidden flex bg-pro-surface p-1 rounded-2xl border border-pro-border w-full">
-            <button 
-              onClick={() => setActiveTab('analysis')}
-              className={`flex-1 py-3 rounded-xl transition-all text-[10px] font-black uppercase tracking-widest ${activeTab === 'analysis' ? 'bg-pro-text text-pro-bg' : 'text-pro-sub'}`}
-            >
-              Analysis
-            </button>
-            <button 
-              onClick={() => setActiveTab('history')}
-              className={`flex-1 py-3 rounded-xl transition-all text-[10px] font-black uppercase tracking-widest ${activeTab === 'history' ? 'bg-pro-text text-pro-bg' : 'text-pro-sub'}`}
-            >
-              Archive
-            </button>
-          </div>
+          <AnimatePresence>
+            {showWelcome && (
+              <motion.div 
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-pro-blue/10 border border-pro-blue/20 p-4 sm:p-6 rounded-3xl flex items-center gap-4 sm:gap-5 relative overflow-hidden backdrop-blur-md"
+              >
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-pro-blue/20 flex items-center justify-center shrink-0">
+                  <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-pro-blue" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-sm sm:text-lg font-black text-pro-text uppercase italic truncate">Access Authorized</h3>
+                  <p className="text-pro-sub text-xs sm:text-sm font-medium truncate sm:whitespace-normal">Operative <span className="text-pro-blue font-bold">{user?.username}</span> verified.</p>
+                </div>
+                <button onClick={() => setShowWelcome(false)} className="p-2 hover:bg-white/5 rounded-xl transition-colors">
+                  <X className="w-5 h-5 text-pro-sub" />
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <AnimatePresence mode="wait">
             {activeTab === 'analysis' ? (
               <motion.div key="analysis" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-8 lg:space-y-12">
                 
-                {/* Stats - Grid adjustments for tablets */}
+                {/* Stats */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-8">
                   <StatCard label="Total Scans" value={stats?.total_checks || 0} icon={Cpu} color="blue" delay={0.1} />
                   <StatCard label="Verified Real" value={stats?.real_count || 0} icon={CheckCircle} color="green" delay={0.2} />
@@ -279,13 +262,13 @@ const Dashboard = () => {
 
                 <div className="max-w-4xl mx-auto w-full space-y-8 lg:space-y-12">
                   <motion.div className="pro-card p-6 md:p-10 xl:p-12 relative overflow-hidden">
-                    {/* Input Mode Selector - Action Cards */}
+                    {/* Input Mode Selector */}
                     <div className="flex flex-col sm:flex-row items-stretch gap-3 md:gap-4 mb-4 sm:mb-6">
                       <button 
                         onClick={() => handleModeSwitch('text')}
                         className={`flex-1 p-3 md:p-4 rounded-xl md:rounded-2xl border transition-all text-left flex items-center gap-3 md:gap-4 group active:scale-[0.98] ${inputMode === 'text' ? 'bg-pro-blue/10 border-pro-blue/40 shadow-lg' : 'bg-pro-surface border-pro-border hover:border-pro-sub/30'}`}
                       >
-                        <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center transition-colors ${inputMode === 'text' ? 'bg-pro-blue text-pro-text' : 'bg-pro-bg/40 text-pro-sub'}`}>
+                        <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center transition-colors ${inputMode === 'text' ? 'bg-pro-blue text-white' : 'bg-pro-bg/40 text-pro-sub'}`}>
                           <FileText className="w-4 h-4 md:w-5 md:h-5" />
                         </div>
                         <div className="min-w-0">
@@ -298,7 +281,7 @@ const Dashboard = () => {
                         onClick={() => handleModeSwitch('image')}
                         className={`flex-1 p-3 md:p-4 rounded-xl md:rounded-2xl border transition-all text-left flex items-center gap-3 md:gap-4 group active:scale-[0.98] ${inputMode === 'image' ? 'bg-pro-blue/10 border-pro-blue/40 shadow-lg' : 'bg-pro-surface border-pro-border hover:border-pro-sub/30'}`}
                       >
-                        <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center transition-colors ${inputMode === 'image' ? 'bg-pro-blue text-pro-text' : 'bg-pro-bg/40 text-pro-sub'}`}>
+                        <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center transition-colors ${inputMode === 'image' ? 'bg-pro-blue text-white' : 'bg-pro-bg/40 text-pro-sub'}`}>
                           <Scan className="w-4 h-4 md:w-5 md:h-5" />
                         </div>
                         <div className="min-w-0">
@@ -419,7 +402,7 @@ const Dashboard = () => {
             )}
           </AnimatePresence>
         </div>
-      </main>
+      </motion.main>
     </div>
   );
 };
