@@ -213,7 +213,7 @@ const Dashboard = () => {
             </button>
             <div className="flex-1 lg:flex-none text-right lg:text-left">
               <h1 className="text-2xl sm:text-4xl xl:text-5xl font-black tracking-tightest text-pro-text italic">
-                {activeTab === 'analysis' ? 'Intelligence' : 'Archive'}
+                {activeTab === 'analysis' ? 'News Analyst' : 'Archive'}
               </h1>
               <p className="text-pro-sub text-[10px] sm:text-xs font-bold uppercase tracking-widest mt-1 sm:mt-2">
                 {activeTab === 'analysis' ? 'Neural Workspace' : 'Tactical Records'}
