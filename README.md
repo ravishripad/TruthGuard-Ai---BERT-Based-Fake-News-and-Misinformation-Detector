@@ -115,6 +115,40 @@ API rate limits enforced via **slowapi** (per client IP):
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+### Hybrid Model Architecture (Mermaid)
+
+```mermaid
+flowchart TD
+  A[Input Text] --> B[Tokenizer<br/>bert-base-uncased]
+    B --> C[input_ids, attention_mask]
+
+  C --> D[BERT Encoder<br/>Hidden Size: 768]
+    D --> E[Dropout]
+  E --> F[BiLSTM<br/>2 layers, hidden=256, bidirectional]
+  F --> G[LayerNorm<br/>Output dim: 512]
+  G --> H[Multi-Head Self-Attention<br/>8 heads]
+
+  H --> I[Global Max Pooling<br/>across sequence]
+    I --> J[MLP Classifier]
+
+    J --> J1[Linear 512->256 + ReLU + Dropout]
+    J1 --> J2[Linear 256->128 + ReLU + Dropout]
+    J2 --> J3[Linear 128->2]
+
+    J3 --> K[Logits: Real vs Fake]
+    K --> L[Softmax / Argmax Prediction]
+
+    subgraph Training
+      M[CrossEntropyLoss<br/>class weights + label smoothing]
+      N[AdamW + LR Scheduler<br/>Warmup + Weight Decay]
+      O[Early Stopping<br/>monitor val F1]
+    end
+
+    J3 --> M
+    M --> N
+    N --> O
+```
+
 ---
 
 ## 📁 Project Structure
