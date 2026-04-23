@@ -1,0 +1,83 @@
+# ================================================================
+# docker-compose.yml  –  thruthGuard AI / Fake-News Detector
+# Open-source stack: FastAPI backend + React/Nginx frontend + MongoDB
+# ================================================================
+#
+# Quick start:
+#   1. cp .env.example .env     (fill in your API keys)
+#   2. docker compose up --build
+#   3. Open http://localhost  in your browser
+# ================================================================
+
+services:
+
+  # ── MongoDB ──────────────────────────────────────────────────
+  mongodb:
+    image: mongo:7.0
+    container_name: fakenews_mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-changeme}
+      MONGO_INITDB_DATABASE: ${DATABASE_NAME:-fake_news_detector}
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      - "27017:27017"          # expose only for local development; remove in production
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ── FastAPI backend ───────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fakenews_backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Overrides anything in .env for the MongoDB URL (uses the container hostname)
+      MONGODB_URL: mongodb://${MONGO_ROOT_USER:-admin}:${MONGO_ROOT_PASSWORD:-changeme}@mongodb:27017/${DATABASE_NAME:-fake_news_detector}?authSource=admin
+      DATABASE_NAME: ${DATABASE_NAME:-fake_news_detector}
+      # Allow requests from Nginx (same-origin in production, localhost during dev)
+      ALLOWED_ORIGINS: "http://localhost,http://localhost:80,http://127.0.0.1,http://localhost:3000,http://localhost:5173"
+    volumes:
+      - ./logs:/app/logs           # persist logs on the host
+    ports:
+      - "8000:8000"                # expose for direct API access / debugging
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s            # BERT model loading takes ~60 s
+
+  # ── React frontend (Nginx) ────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # All /api calls go to the same origin so the browser hits Nginx,
+        # which proxies to the backend container.
+        VITE_API_URL: /api
+    container_name: fakenews_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"                    # main entry point for users
+    depends_on:
+      backend:
+        condition: service_healthy
+
+# ── Named volumes ─────────────────────────────────────────────
+volumes:
+  mongo_data:
+    driver: local
+

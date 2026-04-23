@@ -114,7 +114,7 @@ const Home = () => {
             </div>
             <div>
               <h1 className="text-sm md:text-xl font-black text-pro-text tracking-tighter uppercase leading-none italic">
-                thruthGuard <span className="text-pro-blue">AI</span>
+                TruthGuard <span className="text-pro-blue">AI</span>
               </h1>
               <p className="text-[7px] md:text-[9px] text-pro-sub font-bold tracking-[0.2em] uppercase mt-0.5 md:mt-1">
                 Neural Network v4.0
