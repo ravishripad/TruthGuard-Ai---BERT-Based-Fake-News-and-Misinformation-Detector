@@ -15,7 +15,10 @@ import {
   Menu,
   FileText,
   Scan,
-  Terminal
+  Terminal,
+  Trash2,
+  RefreshCw,
+  Link2
 } from 'lucide-react';
 
 // Components
@@ -39,11 +42,16 @@ const Dashboard = () => {
   const [stats, setStats] = useState(null);
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState('');
+  const [historyBusyId, setHistoryBusyId] = useState(null);
+  const [clearingHistory, setClearingHistory] = useState(false);
+  const [selectedHistoryId, setSelectedHistoryId] = useState(null);
   const [analysisTime, setAnalysisTime] = useState(null);
   
   const [inputMode, setInputMode] = useState('text');
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [articleUrl, setArticleUrl] = useState('');
   const fileInputRef = useRef(null);
   const resultsRef = useRef(null);
 
@@ -87,6 +95,8 @@ const Dashboard = () => {
     setError('');
   };
 
+  const isValidUrl = (value) => /^https?:\/\/\S+$/i.test(value.trim());
+
   const loadStats = async () => {
     try {
       const response = await authAPI.getStats();
@@ -98,11 +108,19 @@ const Dashboard = () => {
 
   const loadHistory = async () => {
     setHistoryLoading(true);
+    setHistoryError('');
     try {
       const response = await authAPI.getHistory(20);
-      setHistory(response.data.predictions || []);
+      const predictions = response.data.predictions || [];
+      setHistory(predictions);
+      setSelectedHistoryId((currentId) => {
+        if (!predictions.length) return null;
+        if (currentId && predictions.some((item) => item._id === currentId)) return currentId;
+        return predictions[0]._id;
+      });
     } catch (err) {
       console.error('Failed to load history:', err);
+      setHistoryError('Unable to load your archive right now.');
     } finally {
       setHistoryLoading(false);
     }
@@ -162,7 +180,35 @@ const Dashboard = () => {
     }
   };
 
+  const handleUrlAnalyze = async () => {
+    if (!isValidUrl(articleUrl)) {
+      setError('Enter a valid article URL starting with http:// or https://');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setResult(null);
+    const startTime = Date.now();
+    try {
+      const response = await predictionAPI.urlPredict(articleUrl.trim());
+      setResult(response.data);
+      setAnalysisTime(((Date.now() - startTime) / 1000).toFixed(1));
+      loadStats();
+      loadHistory();
+    } catch (err) {
+      if (err.response?.status === 404) {
+        setError('The backend you are connected to does not support URL scanning yet. Restart or redeploy the API first.');
+      } else {
+        setError(err.response?.data?.detail || 'URL analysis failed.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleHistoryPrefill = (item) => {
+    setSelectedHistoryId(item._id);
     setTitle(item.text || '');
     setInputMode('text');
     setActiveTab('analysis');
@@ -170,6 +216,102 @@ const Dashboard = () => {
     const mainContainer = document.querySelector('main');
     if (mainContainer) mainContainer.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  const handleDeleteHistoryItem = async (itemId) => {
+    const confirmed = window.confirm('Delete this history item? This cannot be undone.');
+    if (!confirmed) return;
+
+    setHistoryBusyId(itemId);
+    setHistoryError('');
+    try {
+      await authAPI.deleteHistoryItem(itemId);
+      const nextHistory = history.filter((item) => item._id !== itemId);
+      setHistory(nextHistory);
+      setSelectedHistoryId((selectedId) => {
+        if (selectedId !== itemId) return selectedId;
+        return nextHistory[0]?._id || null;
+      });
+      loadStats();
+    } catch (err) {
+      console.error('Failed to delete history item:', err);
+      setHistoryError('Unable to delete that history item.');
+    } finally {
+      setHistoryBusyId(null);
+    }
+  };
+
+  const handleClearHistory = async () => {
+    if (!history.length) return;
+
+    const confirmed = window.confirm('Delete all history items? This cannot be undone.');
+    if (!confirmed) return;
+
+    setClearingHistory(true);
+    setHistoryError('');
+    try {
+      await authAPI.clearHistory();
+      setHistory([]);
+      setSelectedHistoryId(null);
+      loadStats();
+    } catch (err) {
+      console.error('Failed to clear history:', err);
+      setHistoryError('Unable to clear your archive right now.');
+    } finally {
+      setClearingHistory(false);
+    }
+  };
+
+  const selectedHistoryItem = history.find((item) => item._id === selectedHistoryId) || null;
+  const tabMeta = {
+    analysis: {
+      title: 'News Analyst',
+      subtitle: 'Neural Workspace',
+    },
+    workflow: {
+      title: 'Workflow',
+      subtitle: 'Detection Demonstration',
+    },
+    history: {
+      title: 'Archive',
+      subtitle: 'Tactical Records',
+    },
+  };
+  const workflowStages = [
+      {
+        step: '01',
+        title: 'Capture Claim',
+        description: 'The system ingests a headline, a scraped article URL, or OCR-extracted text from an uploaded image.',
+      },
+    {
+      step: '02',
+      title: 'Cross-Check Evidence',
+      description: 'The claim is matched against live news coverage to see whether trusted reporting supports or challenges it.',
+    },
+    {
+      step: '03',
+      title: 'Model Decision',
+      description: 'Gemini AI performs the primary reasoning pass, and BERT steps in as fallback when the AI layer is unavailable.',
+    },
+    {
+      step: '04',
+      title: 'Return Verdict',
+      description: 'The app combines confidence, source validation, and reasoning into a final fake or real verdict.',
+    },
+  ];
+  const workflowSignals = [
+    {
+      label: 'Text Scan',
+      detail: 'Direct headline and article content are pushed into the verification engine for fast classification.',
+    },
+    {
+      label: 'URL Scrape',
+      detail: 'A live article page is scraped first so the detector can analyze the actual news content and not only a link.',
+    },
+    {
+      label: 'Image OCR',
+      detail: 'Text is extracted from screenshots or posters before the normal fake-news pipeline starts.',
+    },
+  ];
 
   return (
     <div className="h-screen min-h-[100dvh] bg-pro-bg text-pro-text flex font-sans overflow-hidden relative">
@@ -213,10 +355,10 @@ const Dashboard = () => {
             </button>
             <div className="flex-1 lg:flex-none text-right lg:text-left">
               <h1 className="text-2xl sm:text-4xl xl:text-5xl font-black tracking-tightest text-pro-text italic">
-                {activeTab === 'analysis' ? 'News Analyst' : 'Archive'}
+                {tabMeta[activeTab]?.title || 'News Analyst'}
               </h1>
               <p className="text-pro-sub text-[10px] sm:text-xs font-bold uppercase tracking-widest mt-1 sm:mt-2">
-                {activeTab === 'analysis' ? 'Neural Workspace' : 'Tactical Records'}
+                {tabMeta[activeTab]?.subtitle || 'Neural Workspace'}
               </p>
             </div>
             
@@ -263,9 +405,9 @@ const Dashboard = () => {
                 <div className="max-w-4xl mx-auto w-full space-y-8 lg:space-y-12">
                   <motion.div className="pro-card p-6 md:p-10 xl:p-12 relative overflow-hidden">
                     {/* Input Mode Selector */}
-                    <div className="flex flex-col sm:flex-row items-stretch gap-3 md:gap-4 mb-4 sm:mb-6">
-                      <button 
-                        onClick={() => handleModeSwitch('text')}
+                      <div className="flex flex-col sm:flex-row items-stretch gap-3 md:gap-4 mb-4 sm:mb-6">
+                        <button 
+                          onClick={() => handleModeSwitch('text')}
                         className={`flex-1 p-3 md:p-4 rounded-xl md:rounded-2xl border transition-all text-left flex items-center gap-3 md:gap-4 group active:scale-[0.98] ${inputMode === 'text' ? 'bg-pro-blue/10 border-pro-blue/40 shadow-lg' : 'bg-pro-surface border-pro-border hover:border-pro-sub/30'}`}
                       >
                         <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center transition-colors ${inputMode === 'text' ? 'bg-pro-blue text-white' : 'bg-pro-bg/40 text-pro-sub'}`}>
@@ -284,12 +426,25 @@ const Dashboard = () => {
                         <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center transition-colors ${inputMode === 'image' ? 'bg-pro-blue text-white' : 'bg-pro-bg/40 text-pro-sub'}`}>
                           <Scan className="w-4 h-4 md:w-5 md:h-5" />
                         </div>
-                        <div className="min-w-0">
-                          <h4 className={`font-black uppercase tracking-widest text-[9px] md:text-[10px] truncate ${inputMode === 'image' ? 'text-pro-blue' : 'text-pro-sub'}`}>Visual Evidence</h4>
-                          <p className="text-[8px] md:text-[9px] font-bold text-pro-sub opacity-60 truncate">OCR Extraction</p>
-                        </div>
-                      </button>
-                    </div>
+                          <div className="min-w-0">
+                            <h4 className={`font-black uppercase tracking-widest text-[9px] md:text-[10px] truncate ${inputMode === 'image' ? 'text-pro-blue' : 'text-pro-sub'}`}>Visual Evidence</h4>
+                            <p className="text-[8px] md:text-[9px] font-bold text-pro-sub opacity-60 truncate">OCR Extraction</p>
+                          </div>
+                        </button>
+
+                        <button 
+                          onClick={() => handleModeSwitch('url')}
+                          className={`flex-1 p-3 md:p-4 rounded-xl md:rounded-2xl border transition-all text-left flex items-center gap-3 md:gap-4 group active:scale-[0.98] ${inputMode === 'url' ? 'bg-pro-blue/10 border-pro-blue/40 shadow-lg' : 'bg-pro-surface border-pro-border hover:border-pro-sub/30'}`}
+                        >
+                          <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center transition-colors ${inputMode === 'url' ? 'bg-pro-blue text-white' : 'bg-pro-bg/40 text-pro-sub'}`}>
+                            <Link2 className="w-4 h-4 md:w-5 md:h-5" />
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className={`font-black uppercase tracking-widest text-[9px] md:text-[10px] truncate ${inputMode === 'url' ? 'text-pro-blue' : 'text-pro-sub'}`}>Live URL</h4>
+                            <p className="text-[8px] md:text-[9px] font-bold text-pro-sub opacity-60 truncate">Web Scraping</p>
+                          </div>
+                        </button>
+                      </div>
 
                     <AnimatePresence mode="wait">
                       {inputMode === 'text' ? (
@@ -316,7 +471,7 @@ const Dashboard = () => {
                             />
                           </div>
                         </motion.div>
-                      ) : (
+                      ) : inputMode === 'image' ? (
                         <motion.div key="image-input" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-6">
                           {!imagePreview ? (
                             <div 
@@ -336,16 +491,58 @@ const Dashboard = () => {
                             </div>
                           )}
                         </motion.div>
+                      ) : (
+                        <motion.div key="url-input" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-6 sm:space-y-8">
+                          <div className="space-y-2">
+                            <label className="text-[9px] font-black text-pro-sub uppercase tracking-[0.3em] ml-1">Protocol: Article URL</label>
+                            <input
+                              type="url"
+                              value={articleUrl}
+                              onChange={(e) => setArticleUrl(e.target.value)}
+                              onKeyDown={(e) => e.key === 'Enter' && !loading && handleUrlAnalyze()}
+                              placeholder="https://example.com/news/article"
+                              className="input-pro !bg-pro-bg/40 border-pro-border text-sm sm:text-base font-medium shadow-inner !py-2.5 sm:!py-3.5"
+                            />
+                          </div>
+                          <div className="rounded-3xl border border-pro-border bg-pro-bg/30 p-5 sm:p-6">
+                            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-pro-blue mb-3">URL Scan Workflow</p>
+                            <p className="text-sm text-pro-sub leading-relaxed">
+                              We scrape the article headline and readable body text from the URL, then cross-check the claim against live news coverage before returning the fake or real verdict.
+                            </p>
+                          </div>
+                        </motion.div>
                       )}
                     </AnimatePresence>
 
                     <div className="mt-8 sm:mt-12 pt-8 sm:pt-12 border-t border-pro-border/50">
+                      {error && (
+                        <div className="mb-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                          {error}
+                        </div>
+                      )}
                       <motion.button
-                        whileTap={!loading && title.length >= 5 ? { scale: 0.98 } : {}}
-                        onClick={inputMode === 'text' ? handleAnalyze : handleImageAnalyze}
-                        disabled={loading || (inputMode === 'text' && title.length < 5) || (inputMode === 'image' && !selectedImage)}
+                        whileTap={
+                          !loading &&
+                          ((inputMode === 'text' && title.length >= 5) ||
+                            (inputMode === 'image' && !!selectedImage) ||
+                            (inputMode === 'url' && isValidUrl(articleUrl)))
+                            ? { scale: 0.98 }
+                            : {}
+                        }
+                        onClick={inputMode === 'text' ? handleAnalyze : inputMode === 'image' ? handleImageAnalyze : handleUrlAnalyze}
+                        disabled={
+                          loading ||
+                          (inputMode === 'text' && title.length < 5) ||
+                          (inputMode === 'image' && !selectedImage) ||
+                          (inputMode === 'url' && !isValidUrl(articleUrl))
+                        }
                         className={`w-full py-4 sm:py-6 rounded-xl sm:rounded-[1.5rem] font-black text-xs sm:text-sm uppercase tracking-[0.4em] transition-all flex items-center justify-center gap-3 sm:gap-4 ${
-                          (loading || (inputMode === 'text' && title.length < 5) || (inputMode === 'image' && !selectedImage))
+                          (
+                            loading ||
+                            (inputMode === 'text' && title.length < 5) ||
+                            (inputMode === 'image' && !selectedImage) ||
+                            (inputMode === 'url' && !isValidUrl(articleUrl))
+                          )
                             ? 'bg-pro-surface border border-pro-border text-pro-sub cursor-not-allowed opacity-40'
                             : 'bg-pro-blue text-white shadow-2xl shadow-pro-blue/30 hover:bg-pro-blue/90 cursor-pointer active:scale-[0.99]'
                         }`}
@@ -361,32 +558,255 @@ const Dashboard = () => {
                   </div>
                 </div>
               </motion.div>
-            ) : (
-              <motion.div key="history" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="max-w-4xl mx-auto w-full pb-12">
-                <div className="pro-card p-6 sm:p-12">
-                  <div className="flex items-center gap-4 sm:gap-6 mb-8 sm:mb-12">
-                    <div className="w-12 h-12 sm:w-16 sm:h-16 bg-pro-blue/10 rounded-2xl sm:rounded-3xl flex items-center justify-center border border-pro-blue/20"><HistoryIcon className="w-6 h-6 sm:w-8 sm:h-8 text-pro-blue" /></div>
+            ) : activeTab === 'workflow' ? (
+              <motion.div key="workflow" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-8 lg:space-y-12">
+                <div className="pro-card p-6 md:p-8 xl:p-10">
+                  <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
                     <div>
-                      <h3 className="text-xl sm:text-3xl font-black uppercase tracking-tightest text-pro-text italic">Neural Archive</h3>
-                      <p className="text-pro-sub text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.3em]">Encrypted Tactical Logs</p>
+                      <h3 className="text-xl sm:text-2xl font-black uppercase tracking-tightest text-pro-text italic">Detection Workflow</h3>
+                      <p className="text-pro-sub text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.3em] mt-2">How Fake And Real News Are Verified</p>
+                    </div>
+                    <div className="px-4 py-2 rounded-2xl border border-pro-blue/20 bg-pro-blue/10 text-[10px] font-black uppercase tracking-widest text-pro-blue">
+                      4-Stage Verification
                     </div>
                   </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 xl:gap-8">
+                    {workflowStages.map((stage, index) => (
+                      <div key={stage.step} className="relative">
+                        <div className="rounded-[1.75rem] border border-pro-border bg-pro-bg/30 p-5 relative overflow-hidden">
+                          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-pro-blue/40 to-transparent" />
+                          <p className="text-[10px] font-black uppercase tracking-[0.35em] text-pro-blue mb-3">{stage.step}</p>
+                          <h4 className="text-lg font-black text-pro-text uppercase tracking-tight mb-3">{stage.title}</h4>
+                          <p className="text-sm text-pro-sub leading-relaxed">{stage.description}</p>
+                        </div>
+                        {index < workflowStages.length - 1 && (
+                          <>
+                            <div className="hidden xl:block absolute top-1/2 left-full w-8 h-px -translate-y-1/2 bg-gradient-to-r from-pro-blue/60 to-pro-blue/10" />
+                            <div className="hidden xl:block absolute top-1/2 left-[calc(100%+1.75rem)] w-2 h-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-pro-blue shadow-[0_0_12px_rgba(0,113,227,0.8)]" />
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 xl:grid-cols-[1.4fr_1fr] gap-6 sm:gap-8">
+                  <div className="pro-card p-6 sm:p-8">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="w-10 h-10 rounded-xl bg-pro-blue/10 flex items-center justify-center border border-pro-blue/20">
+                        <Cpu className="w-5 h-5 text-pro-blue" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-extrabold text-pro-text uppercase tracking-wider">Workflow Demonstration</h3>
+                        <p className="text-[9px] font-black text-pro-sub uppercase tracking-[0.2em]">Input To Verdict</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      {workflowStages.map((stage, index) => (
+                        <div key={stage.step} className="relative">
+                          <div className="rounded-3xl border border-pro-border bg-pro-bg/30 p-5 relative overflow-hidden">
+                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-pro-blue/80 via-pro-blue/30 to-transparent" />
+                          <div className="flex items-center justify-between gap-4 mb-3">
+                            <span className="text-[10px] font-black uppercase tracking-[0.35em] text-pro-blue">{stage.step}</span>
+                            {index < workflowStages.length - 1 && (
+                              <span className="text-[10px] font-bold uppercase tracking-widest text-pro-sub">Flows Forward</span>
+                            )}
+                          </div>
+                          <h4 className="text-lg font-black uppercase tracking-tight text-pro-text mb-2">{stage.title}</h4>
+                          <p className="text-sm text-pro-sub leading-relaxed">{stage.description}</p>
+                          </div>
+                          {index < workflowStages.length - 1 && (
+                            <div className="flex justify-center py-2">
+                              <div className="flex flex-col items-center">
+                                <div className="w-px h-6 bg-gradient-to-b from-pro-blue/70 to-pro-blue/10" />
+                                <div className="w-2 h-2 rounded-full bg-pro-blue shadow-[0_0_10px_rgba(0,113,227,0.7)]" />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
+                    <div className="pro-card p-6 sm:p-8">
+                      <h3 className="text-sm font-extrabold text-pro-text uppercase tracking-wider mb-5">Supported Inputs</h3>
+                      <div className="space-y-4">
+                        {workflowSignals.map((signal) => (
+                          <div key={signal.label} className="rounded-3xl border border-pro-border bg-pro-bg/30 p-5">
+                            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-pro-blue mb-2">{signal.label}</p>
+                            <p className="text-sm text-pro-sub leading-relaxed">{signal.detail}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="pro-card p-6 sm:p-8">
+                      <h3 className="text-sm font-extrabold text-pro-text uppercase tracking-wider mb-5">What The User Sees</h3>
+                      <div className="rounded-3xl border border-pro-border bg-pro-bg/30 p-5 space-y-4">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-pro-blue mb-2">Verdict</p>
+                          <p className="text-sm text-pro-sub leading-relaxed">A final fake or real label with confidence score appears after the scan completes.</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-pro-blue mb-2">Reasoning</p>
+                          <p className="text-sm text-pro-sub leading-relaxed">The reasoning panel explains why the detector reached that outcome.</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-pro-blue mb-2">Export</p>
+                          <p className="text-sm text-pro-sub leading-relaxed">Users can download the completed fact check as TXT or PDF after the result appears.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div key="history" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="max-w-4xl mx-auto w-full pb-12">
+                <div className="pro-card p-6 sm:p-12 space-y-8">
+                  <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between mb-2">
+                    <div className="flex items-center gap-4 sm:gap-6">
+                      <div className="w-12 h-12 sm:w-16 sm:h-16 bg-pro-blue/10 rounded-2xl sm:rounded-3xl flex items-center justify-center border border-pro-blue/20"><HistoryIcon className="w-6 h-6 sm:w-8 sm:h-8 text-pro-blue" /></div>
+                      <div>
+                        <h3 className="text-xl sm:text-3xl font-black uppercase tracking-tightest text-pro-text italic">Neural Archive</h3>
+                        <p className="text-pro-sub text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.3em]">Encrypted Tactical Logs</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        onClick={loadHistory}
+                        disabled={historyLoading}
+                        className="px-4 py-3 rounded-2xl border border-pro-border bg-pro-surface/60 text-pro-text text-[10px] font-black uppercase tracking-widest hover:border-pro-blue/60 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        <RefreshCw className={`w-4 h-4 ${historyLoading ? 'animate-spin' : ''}`} />
+                        Refresh
+                      </button>
+                      <button
+                        onClick={handleClearHistory}
+                        disabled={!history.length || clearingHistory}
+                        className="px-4 py-3 rounded-2xl border border-red-500/20 bg-red-500/10 text-red-400 text-[10px] font-black uppercase tracking-widest hover:bg-red-500/15 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        {clearingHistory ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                        Clear All
+                      </button>
+                    </div>
+                  </div>
+
+                  {historyError && (
+                    <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                      {historyError}
+                    </div>
+                  )}
+
+                  {selectedHistoryItem && (
+                    <div className="rounded-[2rem] border border-pro-blue/20 bg-pro-blue/10 p-6 sm:p-8 space-y-5">
+                      <h3 className="text-xl sm:text-3xl font-black uppercase tracking-tightest text-pro-text italic">Neural Archive</h3>
+                      <p className="text-pro-sub text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.3em]">Selected History Record</p>
+                      <p className="text-base sm:text-lg font-bold text-pro-text break-words">{selectedHistoryItem.text}</p>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="rounded-2xl border border-pro-border bg-pro-bg/40 p-4">
+                          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-pro-sub">Verdict</p>
+                          <p className={`mt-2 text-lg font-black uppercase ${selectedHistoryItem.is_fake ? 'text-red-400' : 'text-green-400'}`}>
+                            {selectedHistoryItem.prediction}
+                          </p>
+                        </div>
+                        <div className="rounded-2xl border border-pro-border bg-pro-bg/40 p-4">
+                          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-pro-sub">Confidence</p>
+                          <p className="mt-2 text-lg font-black text-pro-text">
+                            {(selectedHistoryItem.confidence * 100).toFixed(1)}%
+                          </p>
+                        </div>
+                          <div className="rounded-2xl border border-pro-border bg-pro-bg/40 p-4">
+                            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-pro-sub">Input</p>
+                            <p className="mt-2 text-lg font-black text-pro-text uppercase">
+                              {selectedHistoryItem.from_image ? 'Image' : selectedHistoryItem.from_url ? 'URL' : 'Text'}
+                            </p>
+                          </div>
+                        <div className="rounded-2xl border border-pro-border bg-pro-bg/40 p-4">
+                          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-pro-sub">Saved</p>
+                          <p className="mt-2 text-sm font-bold text-pro-text">
+                            {new Date(selectedHistoryItem.created_at).toLocaleString()}
+                          </p>
+                          </div>
+                        </div>
+                        {selectedHistoryItem.source_url && (
+                          <div className="rounded-2xl border border-pro-border bg-pro-bg/30 p-4">
+                            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-pro-sub mb-2">Source URL</p>
+                            <a
+                              href={selectedHistoryItem.source_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-pro-blue break-all hover:underline"
+                            >
+                              {selectedHistoryItem.source_url}
+                            </a>
+                          </div>
+                        )}
+                        <div className="flex flex-wrap gap-3">
+                        <button
+                          onClick={() => handleHistoryPrefill(selectedHistoryItem)}
+                          className="px-5 py-3 rounded-2xl bg-pro-blue text-white text-[10px] font-black uppercase tracking-widest hover:bg-pro-blue/90 transition-all"
+                        >
+                          Reuse Scan Input
+                        </button>
+                        <button
+                          onClick={() => handleDeleteHistoryItem(selectedHistoryItem._id)}
+                          disabled={historyBusyId === selectedHistoryItem._id}
+                          className="px-5 py-3 rounded-2xl border border-red-500/20 bg-red-500/10 text-red-400 text-[10px] font-black uppercase tracking-widest hover:bg-red-500/15 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                          {historyBusyId === selectedHistoryItem._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                          Delete Record
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 gap-4 sm:gap-6">
                     {historyLoading ? [...Array(5)].map((_, i) => <div key={i} className="h-20 sm:h-28 bg-pro-surface rounded-2xl sm:rounded-[2rem] animate-pulse border border-pro-border" />)
                     : history.length > 0 ? history.map((item, i) => (
-                      <div key={i} onClick={() => handleHistoryPrefill(item)} className="group p-5 sm:p-8 bg-pro-surface/40 backdrop-blur-md border border-pro-border/50 rounded-2xl sm:rounded-[2.5rem] hover:border-pro-blue/80 hover:bg-pro-blue/10 hover:shadow-[0_0_30px_rgba(0,113,227,0.15)] transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div
+                        key={item._id}
+                        onClick={() => setSelectedHistoryId(item._id)}
+                        className={`group p-5 sm:p-8 bg-pro-surface/40 backdrop-blur-md border rounded-2xl sm:rounded-[2.5rem] transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                          selectedHistoryId === item._id
+                            ? 'border-pro-blue bg-pro-blue/10 shadow-[0_0_30px_rgba(0,113,227,0.15)]'
+                            : 'border-pro-border/50 hover:border-pro-blue/80 hover:bg-pro-blue/10 hover:shadow-[0_0_30px_rgba(0,113,227,0.15)]'
+                        }`}
+                      >
                         <div className="flex-1 min-w-0">
                           <p className="text-base sm:text-lg font-bold text-pro-text truncate mb-2 sm:mb-3">{item.text}</p>
-                          <div className="flex items-center gap-3 sm:gap-4">
-                             <span className={`text-[8px] sm:text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full border ${item.is_fake ? 'text-red-500 border-red-500/20 bg-red-500/10' : 'text-green-500 border-green-500/20 bg-green-500/10'}`}>{item.prediction}</span>
-                             <span className="text-[9px] sm:text-[11px] font-bold text-pro-sub uppercase tracking-widest">{new Date(item.created_at).toLocaleDateString()}</span>
+                          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+                               <span className={`text-[8px] sm:text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full border ${item.is_fake ? 'text-red-500 border-red-500/20 bg-red-500/10' : 'text-green-500 border-green-500/20 bg-green-500/10'}`}>{item.prediction}</span>
+                               <span className="text-[9px] sm:text-[11px] font-bold text-pro-sub uppercase tracking-widest">{new Date(item.created_at).toLocaleDateString()}</span>
+                               <span className="text-[9px] sm:text-[11px] font-bold text-pro-sub uppercase tracking-widest">{item.from_image ? 'Image Scan' : item.from_url ? 'URL Scan' : 'Text Scan'}</span>
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-4 sm:gap-6 self-end sm:self-center">
+                        <div className="flex items-center gap-3 sm:gap-4 self-end sm:self-center">
                            <div className="text-right">
                               <p className="text-[8px] sm:text-[10px] font-black text-pro-sub uppercase tracking-widest">Score</p>
                               <p className="text-lg sm:text-xl font-black text-pro-text tracking-tight">{(item.confidence * 100).toFixed(0)}%</p>
                            </div>
+                           <button
+                             onClick={(event) => {
+                               event.stopPropagation();
+                               handleHistoryPrefill(item);
+                             }}
+                             className="px-4 py-3 rounded-2xl border border-pro-border bg-pro-bg/50 text-pro-text text-[10px] font-black uppercase tracking-widest hover:border-pro-blue/60 transition-all"
+                           >
+                             Reuse
+                           </button>
+                           <button
+                             onClick={(event) => {
+                               event.stopPropagation();
+                               handleDeleteHistoryItem(item._id);
+                             }}
+                             disabled={historyBusyId === item._id}
+                             className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 hover:bg-red-500/15 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                           >
+                             {historyBusyId === item._id ? <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" /> : <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />}
+                           </button>
                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-pro-surface border border-pro-border flex items-center justify-center group-hover:bg-pro-blue transition-all group-hover:scale-110"><ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 text-pro-sub group-hover:text-pro-text" /></div>
                         </div>
                       </div>

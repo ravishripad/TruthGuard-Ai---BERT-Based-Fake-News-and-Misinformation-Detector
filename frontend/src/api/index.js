@@ -37,6 +37,8 @@ export const authAPI = {
   login: (data) => api.post('/auth/login', data),
   getMe: () => api.get('/auth/me'),
   getHistory: (limit = 20) => api.get(`/auth/history?limit=${limit}`),
+  deleteHistoryItem: (predictionId) => api.delete(`/auth/history/${predictionId}`),
+  clearHistory: () => api.delete('/auth/history'),
   getStats: () => api.get('/auth/stats'),
   logout: () => api.post('/auth/logout'),
 };
@@ -45,6 +47,7 @@ export const authAPI = {
 export const predictionAPI = {
   predict: (title, text = null) => api.post('/predict', { title, text }),
   batchPredict: (texts) => api.post('/batch-predict', texts),
+  urlPredict: (url) => api.post('/url-predict', { url }),
   imagePredict: (imageBase64, mimeType = 'image/jpeg') => 
     api.post('/image-predict', { image: imageBase64, mime_type: mimeType }),
   extractImageText: (imageBase64, mimeType = 'image/jpeg') =>

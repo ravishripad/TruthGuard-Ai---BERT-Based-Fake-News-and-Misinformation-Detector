@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* ─────────────────────────────────────────────────────────
-   TruthLens Pro — Universal Responsive System
+   thruthGuard AI  — Universal Responsive System
    Optimized for Desktop, Tablet, Foldable & Phone
    ───────────────────────────────────────────────────────── */
 
@@ -239,3 +239,4 @@
 
 /* Tracking utility */
 .tracking-tightest { letter-spacing: -0.05em; }
+

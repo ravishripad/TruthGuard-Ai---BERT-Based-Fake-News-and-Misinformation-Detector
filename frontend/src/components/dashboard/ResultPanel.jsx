@@ -12,9 +12,11 @@ import {
   ShieldAlert,
   Fingerprint,
   Activity,
-  Zap
+  Zap,
+  Download
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { downloadFactCheckPdf, downloadFactCheckTxt } from '../../utils/reportExport';
 
 const ResultPanel = React.memo(({ result, analysisTime }) => {
   const [expandedSections, setExpandedSections] = useState({
@@ -43,6 +45,50 @@ const ResultPanel = React.memo(({ result, analysisTime }) => {
   const chartData = [
     { name: 'Fake', value: result.probabilities.fake * 100 },
     { name: 'Real', value: result.probabilities.real * 100 }
+  ];
+
+  const predictionSourceLabel = {
+    gemini_ai: 'Gemini AI Primary Check',
+    bert_model_fallback: 'BERT Fallback Model',
+    bert_model: 'BERT Model',
+  }[result.prediction_source] || 'Hybrid Verification Engine';
+
+  const verificationStatus =
+    result.news_validation?.verification_status?.replace(/_/g, ' ') || 'news cross-check unavailable';
+
+  const workflowSteps = [
+    {
+      title: 'Input Captured',
+      description: result.extracted_from_image
+        ? 'Image OCR extracted the claim before verification started.'
+        : result.extracted_from_url
+          ? 'The article URL was scraped to extract the headline and readable article body.'
+          : 'Headline and article context were prepared for the verification run.',
+      meta: result.extracted_from_image ? 'Image evidence pipeline' : result.extracted_from_url ? 'URL scraping pipeline' : 'Text evidence pipeline',
+      icon: Fingerprint,
+    },
+    {
+      title: 'External Evidence Check',
+      description: result.news_validation
+        ? `Live news evidence was checked and marked as ${verificationStatus}.`
+        : 'No external news evidence payload was returned for this scan.',
+      meta: result.news_validation?.relevant_articles
+        ? `${result.news_validation.relevant_articles} relevant articles reviewed`
+        : 'No matching article count available',
+      icon: Newspaper,
+    },
+    {
+      title: 'Decision Engine',
+      description: `${predictionSourceLabel} generated the classification signal used for the verdict.`,
+      meta: result.classification_type === 'binary' ? 'Binary classification' : result.classification_type,
+      icon: Zap,
+    },
+    {
+      title: 'Final Verdict',
+      description: `${result.prediction.toUpperCase()} returned with ${(result.confidence * 100).toFixed(1)}% confidence.`,
+      meta: result.is_fake ? 'Flagged as misinformation risk' : 'Aligned with verified reporting',
+      icon: result.is_fake ? ShieldAlert : CheckCircle,
+    },
   ];
 
   const statusColor = isFake ? 'text-[#ff375f]' : 'text-[#30d158]';
@@ -96,6 +142,23 @@ const ResultPanel = React.memo(({ result, analysisTime }) => {
                 <Activity className="w-4 h-4 text-tech-lime" />
                 <span className="text-xs font-bold text-pro-text">Deep Analysis Complete</span>
               </div>
+            </div>
+
+            <div className="mt-6 flex flex-wrap items-center justify-center md:justify-start gap-3">
+              <button
+                onClick={() => downloadFactCheckTxt(result, analysisTime)}
+                className="inline-flex items-center gap-2 rounded-full border border-pro-border bg-pro-bg px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-pro-text hover:border-pro-blue hover:text-pro-blue transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                Download TXT
+              </button>
+              <button
+                onClick={() => downloadFactCheckPdf(result, analysisTime)}
+                className="inline-flex items-center gap-2 rounded-full border border-pro-blue/30 bg-pro-blue/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-pro-blue hover:bg-pro-blue/15 transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                Download PDF
+              </button>
             </div>
           </div>
         </div>
@@ -236,6 +299,75 @@ const ResultPanel = React.memo(({ result, analysisTime }) => {
           </div>
         </div>
       </div>
+
+      <div className="pro-card p-6 sm:p-8">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-xl bg-pro-blue/10 flex items-center justify-center border border-pro-blue/20">
+            <Activity className="w-5 h-5 text-pro-blue" />
+          </div>
+          <div>
+            <h3 className="text-sm font-extrabold text-pro-text uppercase tracking-wider">Detection Workflow</h3>
+            <p className="text-[9px] font-black text-pro-sub uppercase tracking-[0.2em]">How This Result Was Produced</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          {workflowSteps.map((step, index) => (
+            <div key={step.title} className="rounded-3xl border border-pro-border bg-pro-bg/30 p-5 relative overflow-hidden">
+              <div className="absolute top-4 right-4 text-[10px] font-black uppercase tracking-widest text-pro-sub/50">
+                0{index + 1}
+              </div>
+              <div className="w-11 h-11 rounded-2xl bg-pro-surface border border-pro-border flex items-center justify-center mb-4">
+                <step.icon className="w-5 h-5 text-pro-blue" />
+              </div>
+              <h4 className="text-sm font-black uppercase tracking-tight text-pro-text mb-2">{step.title}</h4>
+              <p className="text-sm text-pro-sub leading-relaxed mb-4">{step.description}</p>
+              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-pro-blue">
+                {step.meta}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {result.url_extraction && (
+        <div className="pro-card p-6 sm:p-8">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-pro-blue/10 flex items-center justify-center border border-pro-blue/20">
+              <ExternalLink className="w-5 h-5 text-pro-blue" />
+            </div>
+            <div>
+              <h3 className="text-sm font-extrabold text-pro-text uppercase tracking-wider">Scraped Article</h3>
+              <p className="text-[9px] font-black text-pro-sub uppercase tracking-[0.2em]">URL Extraction Summary</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="rounded-3xl border border-pro-border bg-pro-bg/30 p-5">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-pro-sub mb-2">Source</p>
+              <p className="text-base font-bold text-pro-text">{result.url_extraction.source || result.url_extraction.domain}</p>
+            </div>
+            <div className="rounded-3xl border border-pro-border bg-pro-bg/30 p-5">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-pro-sub mb-2">Article URL</p>
+              <a
+                href={result.url_extraction.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-pro-blue break-all hover:underline"
+              >
+                {result.url_extraction.url}
+              </a>
+            </div>
+          </div>
+
+          {result.url_extraction.text_preview && (
+            <div className="mt-4 rounded-3xl border border-pro-border bg-pro-bg/30 p-5">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-pro-sub mb-2">Scraped Preview</p>
+              <p className="text-sm text-pro-text leading-relaxed">{result.url_extraction.text_preview}</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Sources Card */}
       {result.news_validation && (

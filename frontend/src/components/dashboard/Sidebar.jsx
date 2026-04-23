@@ -2,7 +2,6 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Shield, 
-  LayoutDashboard, 
   LogOut, 
   User,
   Cpu,
@@ -25,6 +24,7 @@ const Sidebar = ({ isCollapsed, toggleCollapse, isMobileOpen, closeMobile, activ
 
   const menuItems = [
     { id: 'analysis', label: 'Neural Scan', icon: Scan, sub: 'Protocol 01' },
+    { id: 'workflow', label: 'Workflow', icon: Cpu, sub: 'Protocol 02' },
     { id: 'history', label: 'Archive', icon: HistoryIcon, sub: 'Tactical Logs' },
   ];
 
@@ -67,7 +67,7 @@ const Sidebar = ({ isCollapsed, toggleCollapse, isMobileOpen, closeMobile, activ
               animate={{ opacity: 1 }}
               className="text-lg font-black text-pro-text tracking-tightest uppercase italic pr-4"
             >
-              Truth<span className="text-pro-blue">Lens</span>
+            TruthGuard <span className="text-pro-blue">AI</span>
             </motion.h1>
           )}
         </Link>

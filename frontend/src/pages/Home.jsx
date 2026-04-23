@@ -114,7 +114,7 @@ const Home = () => {
             </div>
             <div>
               <h1 className="text-sm md:text-xl font-black text-pro-text tracking-tighter uppercase leading-none italic">
-                Truth<span className="text-pro-blue">Lens</span>
+                thruthGuard <span className="text-pro-blue">AI</span>
               </h1>
               <p className="text-[7px] md:text-[9px] text-pro-sub font-bold tracking-[0.2em] uppercase mt-0.5 md:mt-1">
                 Neural Network v4.0
@@ -123,7 +123,7 @@ const Home = () => {
           </Link>
 
           <div className="hidden lg:flex items-center gap-12">
-            {['Protocol', 'Intelligence', 'Impact'].map((item) => (
+            {['Workflow', 'Intelligence', 'Impact'].map((item) => (
               <a key={item} href={`#${item.toLowerCase()}`} className="text-[11px] font-black uppercase tracking-[0.2em] text-pro-sub hover:text-pro-text transition-colors">
                 {item}
               </a>
@@ -167,7 +167,7 @@ const Home = () => {
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.8, duration: 1 }}
               >
-                In an era of digital noise, TruthLens provides the ultimate neural defense. 
+                In an era of digital noise, TruthGuard AI provides the ultimate neural defense. 
                 Surgical misinformation detection at scale.
               </motion.p>
 
@@ -189,25 +189,42 @@ const Home = () => {
         </section>
 
         {/* ── Story Section ──────────────────────────────── */}
-        <section id="protocol" ref={stepsSectionRef} className={`py-24 md:py-64 px-4 md:px-8 ${isDark ? 'bg-pro-surface/40' : 'bg-indigo-50/50'}`}>
+        <section id="workflow" ref={stepsSectionRef} className={`py-24 md:py-64 px-4 md:px-8 ${isDark ? 'bg-pro-surface/40' : 'bg-indigo-50/50'}`}>
           <div className="max-w-6xl mx-auto relative">
+            <div className="mb-16 md:mb-24 text-center md:text-left">
+              <span className="text-pro-blue font-black text-[10px] md:text-xs uppercase tracking-[0.45em] block mb-4">Workflow</span>
+              <h2 className="text-4xl sm:text-6xl md:text-7xl font-black tracking-tightest text-pro-text uppercase italic">See The Detection Workflow</h2>
+            </div>
             <div ref={lineRef} className={`absolute left-0 top-0 w-[1px] h-full origin-top hidden md:block ${isDark ? 'bg-white/10' : 'bg-indigo-200'}`} />
             
-            <div className="space-y-40 md:space-y-80">
+            <div className="space-y-20 md:space-y-28">
               {[
-                { title: 'Extraction', phase: '01', desc: 'Tactical data ingestion across all digital formats. Normalized for deep scanning.' },
-                { title: 'Dissection', phase: '02', desc: 'BERT-powered linguistic mapping scans 50+ misinformation markers in milliseconds.' },
-                { title: 'Verdict',    phase: '03', desc: 'Comprehensive truth-score delivery. Mathematically-backed probability rankings.' }
-              ].map((step, i) => (
-                <div key={i} ref={el => (stepEls.current[i] = el)} className="md:pl-32 relative">
-                  <div className="absolute left-[-4px] top-4 w-2 h-2 rounded-full bg-pro-blue hidden md:block" />
-                  <div className="step-text text-center md:text-left">
-                    <span className="text-pro-blue font-black text-[10px] md:text-xs uppercase tracking-[0.4em] block mb-4 md:mb-8">Phase {step.phase}</span>
-                    <h2 className="text-4xl sm:text-6xl md:text-[10rem] font-black tracking-tightest mb-6 md:mb-12 uppercase italic text-pro-text leading-[0.9] md:leading-none break-words">{step.title}</h2>
-                    <p className="text-lg sm:text-2xl md:text-3xl text-pro-sub max-w-3xl mx-auto md:mx-0 leading-snug font-medium md:text-balance px-4 md:px-0">
-                      {step.desc}
-                    </p>
+                { title: 'Capture', phase: '01', desc: 'Tactical data ingestion across text, URLs, and images. Every claim is normalized before verification begins.' },
+                { title: 'Cross-Check', phase: '02', desc: 'Live news evidence, AI reasoning, and fallback BERT analysis are combined to challenge misinformation signals.' },
+                { title: 'Verdict',    phase: '03', desc: 'Comprehensive truth-score delivery with confidence, reasoning, and export-ready fact-check output.' }
+              ].map((step, i, steps) => (
+                <div key={i}>
+                  <div ref={el => (stepEls.current[i] = el)} className="md:pl-32 relative">
+                    <div className="absolute left-[-4px] top-4 w-2 h-2 rounded-full bg-pro-blue hidden md:block" />
+                    <div className="step-text text-center md:text-left">
+                      <span className="text-pro-blue font-black text-[10px] md:text-xs uppercase tracking-[0.4em] block mb-4 md:mb-8">Step {step.phase}</span>
+                      <h2 className="text-4xl sm:text-6xl md:text-[10rem] font-black tracking-tightest mb-6 md:mb-12 uppercase italic text-pro-text leading-[0.9] md:leading-none break-words">{step.title}</h2>
+                      <p className="text-lg sm:text-2xl md:text-3xl text-pro-sub max-w-3xl mx-auto md:mx-0 leading-snug font-medium md:text-balance px-4 md:px-0">
+                        {step.desc}
+                      </p>
+                    </div>
                   </div>
+                  {i < steps.length - 1 && (
+                    <div className="flex justify-center md:justify-start md:pl-32 py-8 md:py-10">
+                      <div className="flex flex-col items-center md:items-start">
+                        <div className={`h-12 md:h-16 w-px ${isDark ? 'bg-gradient-to-b from-pro-blue/70 to-white/10' : 'bg-gradient-to-b from-pro-blue/70 to-indigo-200'}`} />
+                        <div className="mt-2 flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-pro-blue shadow-[0_0_10px_rgba(0,113,227,0.8)]" />
+                          <div className={`w-12 md:w-20 h-px ${isDark ? 'bg-gradient-to-r from-pro-blue/60 to-white/10' : 'bg-gradient-to-r from-pro-blue/60 to-indigo-200'}`} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -313,7 +330,7 @@ const Home = () => {
             </div>
             <div>
               <h1 className="text-xl font-black text-pro-text tracking-tighter uppercase leading-none italic">
-                Truth<span className="text-pro-blue">Lens</span>
+                ThruthGuard <span className="text-pro-blue">AI</span>
               </h1>
               <p className="text-[9px] text-pro-sub font-bold tracking-[0.2em] uppercase mt-1">
                 Neural Network v4.0
@@ -321,7 +338,7 @@ const Home = () => {
             </div>
           </div>
           <p className="text-pro-sub text-xs font-black uppercase tracking-[0.4em]">
-            &copy; {new Date().getFullYear()} TruthLens Command Unit.
+            &copy; {new Date().getFullYear()} ThruthGuard AI Command Unit.
           </p>
           <div className="flex gap-16">
              {['API', 'TERMS', 'GIT'].map(link => (
